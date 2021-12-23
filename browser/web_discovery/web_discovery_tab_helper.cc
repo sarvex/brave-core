@@ -56,7 +56,7 @@ void WebDiscoveryTabHelper::DidFinishLoad(
   if (validated_url != base::StringPiece(kBraveSearchUrl))
     return;
 
-  auto* browser = chrome::FindBrowserWithWebContents(web_contents());
+  auto* browser = chrome::FindBrowserWithWebContents(&GetWebContents());
   if (!browser)
     return;
 
@@ -78,7 +78,7 @@ void WebDiscoveryTabHelper::DidFinishLoad(
   IncreaseBraveSearchVisitCount(prefs);
 
   if (ShouldShowWebDiscoveryDialog(prefs))
-    brave::ShowWebDiscoveryDialog(browser, web_contents());
+    brave::ShowWebDiscoveryDialog(browser, &GetWebContents());
 }
 
 bool WebDiscoveryTabHelper::NeedVisitCountHandling(

@@ -64,7 +64,7 @@ void RewardsTabHelper::DidFinishLoad(
     return;
 
 #if BUILDFLAG(ENABLE_IPFS)
-  auto ipns_url = web_contents()->GetURL();
+  auto ipns_url = GetWebContents().GetURL();
   if (ipns_url.SchemeIs(ipfs::kIPNSScheme)) {
     rewards_service_->OnLoad(tab_id_, ipns_url);
     return;
@@ -100,7 +100,7 @@ void RewardsTabHelper::ResourceLoadComplete(
     case network::mojom::RequestDestination::kImage:
     case network::mojom::RequestDestination::kScript:
       rewards_service_->OnXHRLoad(tab_id_, GURL(resource_load_info.final_url),
-                                  web_contents()->GetURL(),
+                                  GetWebContents().GetURL(),
                                   resource_load_info.referrer);
       break;
     default:
@@ -131,7 +131,7 @@ void RewardsTabHelper::OnBrowserSetLastActive(Browser* browser) {
   if (!rewards_service_)
     return;
 
-  if (browser->tab_strip_model()->GetIndexOfWebContents(web_contents()) !=
+  if (browser->tab_strip_model()->GetIndexOfWebContents(&GetWebContents()) !=
       TabStripModel::kNoTab) {
     rewards_service_->OnForeground(tab_id_);
   }
@@ -143,7 +143,7 @@ void RewardsTabHelper::OnBrowserNoLongerActive(Browser* browser) {
   if (!rewards_service_)
     return;
 
-  if (browser->tab_strip_model()->GetIndexOfWebContents(web_contents()) !=
+  if (browser->tab_strip_model()->GetIndexOfWebContents(&GetWebContents()) !=
       TabStripModel::kNoTab) {
     rewards_service_->OnBackground(tab_id_);
   }

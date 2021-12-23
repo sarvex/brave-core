@@ -66,7 +66,7 @@ void BraveWaybackMachineTabHelper::DidFinishNavigation(
 
 void BraveWaybackMachineTabHelper::CreateInfoBar() {
   DCHECK(delegate_);
-  delegate_->CreateInfoBar(web_contents());
+  delegate_->CreateInfoBar(&GetWebContents());
 }
 
 bool BraveWaybackMachineTabHelper::IsWaybackMachineEnabled() const {

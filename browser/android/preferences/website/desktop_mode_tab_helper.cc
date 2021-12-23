@@ -37,7 +37,7 @@ void DesktopModeTabHelper::NavigationEntryCommitted(
 
   const bool desktop_mode_enabled = IsDesktopModeEnabled(web_contents());
   content::NavigationEntry* entry =
-      web_contents()->GetController().GetLastCommittedEntry();
+      GetWebContents().GetController().GetLastCommittedEntry();
   if (desktop_mode_enabled == entry->GetIsOverridingUserAgent())
     return;
 

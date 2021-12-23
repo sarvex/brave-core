@@ -43,7 +43,7 @@ void BraveStatsTabHelper::DidStartNavigation(
 
 void BraveStatsTabHelper::NotifyStatsUpdater() {
   if (g_brave_browser_process->brave_stats_updater()->MaybeDoThresholdPing(1))
-    web_contents()->RemoveUserData(UserDataKey());
+    GetWebContents().RemoveUserData(UserDataKey());
 }
 
 WEB_CONTENTS_USER_DATA_KEY_IMPL(BraveStatsTabHelper);

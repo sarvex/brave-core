@@ -34,7 +34,7 @@ GreaselionTabHelper::~GreaselionTabHelper() {
 void GreaselionTabHelper::OnRulesReady(
     GreaselionDownloadService* download_service) {
   auto* greaselion_service = GreaselionServiceFactory::GetForBrowserContext(
-      web_contents()->GetBrowserContext());
+      GetWebContents().GetBrowserContext());
   if (greaselion_service)
     greaselion_service->UpdateInstalledExtensions();
 }

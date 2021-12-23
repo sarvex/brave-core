@@ -58,7 +58,7 @@ void AdsTabHelper::TabUpdated() {
     return;
   }
 
-  ads_service_->OnTabUpdated(tab_id_, web_contents()->GetVisibleURL(),
+  ads_service_->OnTabUpdated(tab_id_, GetWebContents().GetVisibleURL(),
                              is_active_, is_browser_active_);
 }
 
@@ -215,7 +215,7 @@ void AdsTabHelper::OnBrowserSetLastActive(Browser* browser) {
 
   const bool old_is_browser_active = is_browser_active_;
 
-  if (browser->tab_strip_model()->GetIndexOfWebContents(web_contents()) !=
+  if (browser->tab_strip_model()->GetIndexOfWebContents(&GetWebContents()) !=
       TabStripModel::kNoTab) {
     is_browser_active_ = true;
   }
@@ -232,7 +232,7 @@ void AdsTabHelper::OnBrowserNoLongerActive(Browser* browser) {
 
   const bool old_is_browser_active = is_browser_active_;
 
-  if (browser->tab_strip_model()->GetIndexOfWebContents(web_contents()) !=
+  if (browser->tab_strip_model()->GetIndexOfWebContents(&GetWebContents()) !=
       TabStripModel::kNoTab) {
     is_browser_active_ = false;
   }
