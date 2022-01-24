@@ -41,6 +41,7 @@ import org.chromium.brave_wallet.mojom.KeyringService;
 import org.chromium.brave_wallet.mojom.TransactionInfo;
 import org.chromium.brave_wallet.mojom.TransactionStatus;
 import org.chromium.chrome.R;
+import org.chromium.chrome.browser.app.BraveActivity;
 import org.chromium.chrome.browser.crypto_wallet.AssetRatioServiceFactory;
 import org.chromium.chrome.browser.crypto_wallet.BlockchainRegistryFactory;
 import org.chromium.chrome.browser.crypto_wallet.BraveWalletServiceFactory;
@@ -85,6 +86,7 @@ public class BraveWalletActivity extends BraveWalletBaseActivity implements OnNe
     private ModalDialogManager mModalDialogManager;
     private CryptoWalletOnboardingPagerAdapter cryptoWalletOnboardingPagerAdapter;
     private boolean mShowBiometricPrompt;
+    private boolean mIsFromDapps;
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -113,6 +115,10 @@ public class BraveWalletActivity extends BraveWalletBaseActivity implements OnNe
     @Override
     protected void triggerLayoutInflation() {
         setContentView(R.layout.activity_brave_wallet);
+        mIsFromDapps = false;
+        if (getIntent() != null) {
+            mIsFromDapps = getIntent().getBooleanExtra(Utils.IS_FROM_DAPPS, false);
+        }
         mShowBiometricPrompt = true;
         mToolbar = findViewById(R.id.toolbar);
         mToolbar.setTitleTextColor(getResources().getColor(android.R.color.black));
@@ -389,6 +395,15 @@ public class BraveWalletActivity extends BraveWalletBaseActivity implements OnNe
     @Override
     public void gotoNextPage(boolean finishOnboarding) {
         if (finishOnboarding) {
+            if (mIsFromDapps) {
+                finish();
+                BraveActivity activity = BraveActivity.getBraveActivity();
+                if (activity != null) {
+                    activity.onShowPanel();
+                }
+
+                return;
+            }
             setCryptoLayout();
         } else {
             if (cryptoWalletOnboardingViewPager != null) {
