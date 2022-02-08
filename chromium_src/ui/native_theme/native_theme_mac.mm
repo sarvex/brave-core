@@ -6,6 +6,7 @@
 #include "ui/native_theme/native_theme.h"
 #include "ui/native_theme/native_theme_mac.h"
 
+#if 0
 namespace ui {
 bool ShouldOverride(NativeTheme::ColorId color_id) {
   return color_id == NativeTheme::kColorId_FocusedBorderColor;
@@ -15,6 +16,8 @@ bool ShouldOverride(NativeTheme::ColorId color_id) {
   if (ShouldOverride(color_id)) {                                          \
     return GetAuraColor(color_id, NativeTheme::GetInstanceForNativeUi());  \
   }
+#endif
+#define GET_BRAVE_COLOR(color_id)
 
 }  // namespace ui
 
