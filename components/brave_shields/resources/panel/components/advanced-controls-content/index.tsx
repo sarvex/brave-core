@@ -5,6 +5,7 @@ import Toggle from '../../../../../web-components/toggle'
 import { getLocale } from '../../../../../common/locale'
 import getPanelBrowserAPI, { AdBlockMode, CookieBlockMode, FingerprintMode } from '../../api/panel_browser_api'
 import DataContext from '../../state/context'
+import { ViewType } from '../../state/component_types'
 
 const adBlockModeOptions = [
   { value: AdBlockMode.AGGRESSIVE, text: getLocale('braveShieldsTrackersAndAdsBlockedAgg') },
@@ -33,7 +34,6 @@ function GlobalSettings () {
 
   return (
     <S.SettingsBox>
-      <S.SettingsTitle>{getLocale('braveShieldsGlobalSettingsTitle')}</S.SettingsTitle>
       <a
         href='chrome://settings/shields'
         onClick={handleAnchorClick}
@@ -53,7 +53,7 @@ function GlobalSettings () {
 }
 
 function AdvancedControlsContent () {
-  const { siteBlockInfo, siteSettings, getSiteSettings } = React.useContext(DataContext)
+  const { siteBlockInfo, siteSettings, getSiteSettings, setViewType } = React.useContext(DataContext)
 
   const handleAdBlockModeChange = (e: React.FormEvent<HTMLSelectElement>) => {
     const target = e.target as HTMLSelectElement
@@ -83,22 +83,17 @@ function AdvancedControlsContent () {
     if (getSiteSettings) getSiteSettings()
   }
 
+  const adsListCount = siteBlockInfo?.adsList.length
+  const httpRedirectsListCount = siteBlockInfo?.httpRedirectsList.length
+  const jsListCount = siteBlockInfo?.jsList.length
+
   return (
     <section
       id='advanced-controls-content'
       aria-label={getLocale('braveShieldsAdvancedCtrls')}
     >
       <S.SettingsBox>
-        <S.SettingsTitle>{siteBlockInfo?.host}</S.SettingsTitle>
-        <S.SettingsDesc>{getLocale('braveShieldSettingsDescription')}</S.SettingsDesc>
         <S.ControlGroup>
-          <S.ControlCount
-            aria-label={getLocale('braveShieldsTrackersAndAds')}
-            aria-expanded='false'
-          >
-            <S.CaratDown />
-            <span>{siteBlockInfo?.adsList.length}</span>
-          </S.ControlCount>
           <select
             value={siteSettings?.adBlockMode}
             onChange={handleAdBlockModeChange}
@@ -112,15 +107,14 @@ function AdvancedControlsContent () {
               )
             })}
           </select>
+          <S.CountButton
+            aria-label={getLocale('braveShieldsTrackersAndAds')}
+            onClick={() => setViewType?.(ViewType.AdsList)}
+          >
+            <span>{adsListCount}</span>
+          </S.CountButton>
         </S.ControlGroup>
         <S.ControlGroup>
-          <S.ControlCount
-            aria-label={getLocale('braveShieldsConnectionsUpgraded')}
-            aria-expanded='false'
-          >
-            <S.CaratDown />
-            <span>{siteBlockInfo?.fingerprintsList.length}</span>
-          </S.ControlCount>
           <label>
             <span>{getLocale('braveShieldsConnectionsUpgraded')}</span>
             <Toggle
@@ -130,15 +124,14 @@ function AdvancedControlsContent () {
               accessibleLabel='Enable HTTPS'
             />
           </label>
+          <S.CountButton
+            aria-label={getLocale('braveShieldsConnectionsUpgraded')}
+            onClick={() => setViewType?.(ViewType.HttpsList)}
+          >
+            {httpRedirectsListCount}
+          </S.CountButton>
         </S.ControlGroup>
         <S.ControlGroup>
-          <S.ControlCount
-            aria-label={getLocale('braveShieldsScriptsBlocked')}
-            aria-expanded='false'
-          >
-            <S.CaratDown />
-            <span>{siteBlockInfo?.jsList.length}</span>
-          </S.ControlCount>
           <label>
             <span>{getLocale('braveShieldsScriptsBlocked')}</span>
             <Toggle
@@ -148,15 +141,14 @@ function AdvancedControlsContent () {
               accessibleLabel={getLocale('braveShieldsScriptsBlockedEnable')}
             />
           </label>
+          <S.CountButton
+            aria-label={getLocale('braveShieldsScriptsBlocked')}
+            onClick={() => setViewType?.(ViewType.ScriptsList)}
+          >
+            {jsListCount}
+          </S.CountButton>
         </S.ControlGroup>
         <S.ControlGroup>
-          <S.ControlCount
-            aria-label={getLocale('braveShieldsFingerprintingBlocked')}
-            aria-expanded='false'
-          >
-            <S.CaratDown />
-            <span>{siteBlockInfo?.fingerprintsList.length}</span>
-          </S.ControlCount>
           <select
             onChange={handleFingerprintModeChange}
             value={siteSettings?.fingerprintMode}
@@ -172,7 +164,6 @@ function AdvancedControlsContent () {
           </select>
         </S.ControlGroup>
         <S.ControlGroup>
-          <S.ControlCount disabled />
           <select
             onChange={handleCookieBlockModeChange}
             value={siteSettings?.cookieBlockMode}
@@ -187,6 +178,7 @@ function AdvancedControlsContent () {
               })}
           </select>
         </S.ControlGroup>
+        <S.SettingsDesc>{getLocale('braveShieldSettingsDescription')}</S.SettingsDesc>
       </S.SettingsBox>
       <GlobalSettings />
   </section>

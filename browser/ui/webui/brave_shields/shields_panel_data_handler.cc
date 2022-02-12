@@ -129,6 +129,7 @@ void ShieldsPanelDataHandler::UpdateSiteBlockInfo() {
       shields_data_ctrlr->GetFingerprintsList();
   site_block_info_.http_redirects_list =
       shields_data_ctrlr->GetHttpRedirectsList();
+  site_block_info_.is_shields_enabled = shields_data_ctrlr->GetBraveShieldsEnabled();
 
   // Notify remote that data changed
   if (ui_handler_remote_) {

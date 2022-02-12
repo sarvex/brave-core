@@ -1,7 +1,6 @@
 import styled from 'styled-components'
 import globalIconUrl from '../../../../../web-components/icons/globe.svg'
 import listsIconUrl from '../../../../../web-components/icons/lists.svg'
-import { CaratStrongDownIcon } from 'brave-ui/components/icons'
 
 export const SettingsBox = styled.div`
   padding: 17px 22px;
@@ -20,15 +19,10 @@ export const SettingsBox = styled.div`
   }
 `
 
-export const SettingsTitle = styled.div`
-  color: ${(p) => p.theme.color.text02};
+export const SettingsDesc = styled.p`
   font-family: ${(p) => p.theme.fontFamily.heading};
   font-size: 12px;
   letter-spacing: 0.01em;
-  margin-bottom: 14px;
-`
-
-export const SettingsDesc = styled(SettingsTitle)`
   color: ${(p) => p.theme.color.text03};
 `
 
@@ -49,9 +43,11 @@ export const ListIcon = styled(GlobeIcon)`
 `
 
 export const ControlGroup = styled.div`
-  display: flex;
+  display: grid;
+  grid-gap: 15px;
+  grid-template-columns: 1fr 30px;
   align-items: center;
-  margin-bottom: 22px;
+  margin-bottom: 10px;
 
   select,
   label {
@@ -72,27 +68,31 @@ export const ControlGroup = styled.div`
   }
 `
 
-export const ControlCount = styled.button`
+export const CountButton = styled.button`
   background-color: transparent;
   border: 0;
   padding: 0;
-  display: inline-flex;
-  align-items: center;
+  text-align: center;
   font-family: ${(p) => p.theme.fontFamily.heading};
   font-size: 13px;
   font-weight: 600;
   color: ${(p) => p.theme.color.interactive05};
-  width: 48px;
+  padding: 5px 6px;
+  max-width: 30px;
+  border-radius: 4px;
+  border: 2px solid transparent;
+
+  &:hover {
+    background-color: ${(p) => p.theme.color.disabled};
+  }
+
+  &:focus-visible {
+    border-color: ${(p) => p.theme.color.focusBorder};
+  }
 
   &:disabled,
   [disabled] {
     color: ${(p) => p.theme.color.disabled};
   }
 
-`
-
-export const CaratDown = styled(CaratStrongDownIcon)`
-  width: 18px;
-  height: auto;
-  margin-right: 5px;
 `
