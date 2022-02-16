@@ -10,7 +10,6 @@ import android.os.Bundle;
 import android.widget.EditText;
 
 import androidx.annotation.Nullable;
-import androidx.preference.CheckBoxPreference;
 import androidx.preference.EditTextPreference;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceCategory;
@@ -20,7 +19,6 @@ import androidx.preference.PreferenceScreen;
 import androidx.preference.SwitchPreference;
 
 import org.chromium.base.ContextUtils;
-import org.chromium.base.Log;
 import org.chromium.brave_news.mojom.BraveNewsController;
 import org.chromium.brave_news.mojom.Publisher;
 import org.chromium.brave_news.mojom.PublisherType;
@@ -91,57 +89,61 @@ public class BraveNewsPreferences extends BravePreferenceFragment
         mBraveNewsController.getPublishers((publishers) -> {
             List<Publisher> allPublishers = new ArrayList<>();
             List<Publisher> categoryPublishers = new ArrayList<>();
+            List<Publisher> rssPublishers = new ArrayList<>();
             for (Map.Entry<String, Publisher> entry : publishers.entrySet()) {
                 Publisher publisher = entry.getValue();
                 if (publisher.type != PublisherType.DIRECT_SOURCE) {
                     categoryPublishers.add(publisher);
                     mCategsPublishers.put(publisher.categoryName, categoryPublishers);
                 } else {
-                    addRss(publisher);
+                    rssPublishers.add(publisher);
                 }
             }
             mCategsPublishers.put("All Sources", allPublishers);
             addCategs(mCategsPublishers);
+            addRss(rssPublishers);
         });
     }
 
-    private void addRss(Publisher publisher) {
-        if (publisher.type != PublisherType.DIRECT_SOURCE) {
-            return;
-        }
-        SwitchPreference source = new SwitchPreference(ContextUtils.getApplicationContext());
-        boolean enabled = false;
-        if (publisher.userEnabledStatus == UserEnabled.ENABLED) {
-            enabled = true;
-        } else if (publisher.userEnabledStatus == UserEnabled.NOT_MODIFIED) {
-            enabled = publisher.isEnabled;
-        }
-        source.setTitle(publisher.publisherName);
-        source.setKey(publisher.publisherName);
-        source.setChecked(enabled);
-        source.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
-            @Override
-            public boolean onPreferenceChange(Preference preference, Object newValue) {
-                @UserEnabled.EnumType
-                int type = UserEnabled.NOT_MODIFIED;
-                if ((boolean) newValue) {
-                    type = UserEnabled.ENABLED;
-                } else {
-                    type = UserEnabled.DISABLED;
-                }
-
-                SharedPreferencesManager.getInstance().writeBoolean(
-                        BravePreferenceKeys.BRAVE_NEWS_CHANGE_SOURCE, true);
-
-                if (mBraveNewsController != null) {
-                    mBraveNewsController.setPublisherPref(publisher.publisherId, type);
-                }
-
-                source.setChecked((boolean) newValue);
-                return false;
+    private void addRss(List<Publisher> publishers) {
+        for (Publisher publisher : publishers) {
+            if (publisher.type != PublisherType.DIRECT_SOURCE) {
+                return;
             }
-        });        
-        mRssCategory.addPreference(source);
+            SwitchPreference source = new SwitchPreference(ContextUtils.getApplicationContext());
+            boolean enabled = false;
+            if (publisher.userEnabledStatus == UserEnabled.ENABLED) {
+                enabled = true;
+            } else if (publisher.userEnabledStatus == UserEnabled.NOT_MODIFIED) {
+                enabled = publisher.isEnabled;
+            }
+            source.setTitle(publisher.publisherName);
+            source.setKey(publisher.publisherName);
+            source.setChecked(enabled);
+            source.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+                @Override
+                public boolean onPreferenceChange(Preference preference, Object newValue) {
+                    @UserEnabled.EnumType
+                    int type = UserEnabled.NOT_MODIFIED;
+                    if ((boolean) newValue) {
+                        type = UserEnabled.ENABLED;
+                    } else {
+                        type = UserEnabled.DISABLED;
+                    }
+
+                    SharedPreferencesManager.getInstance().writeBoolean(
+                            BravePreferenceKeys.BRAVE_NEWS_CHANGE_SOURCE, true);
+
+                    if (mBraveNewsController != null) {
+                        mBraveNewsController.setPublisherPref(publisher.publisherId, type);
+                    }
+
+                    source.setChecked((boolean) newValue);
+                    return false;
+                }
+            });
+            mRssCategory.addPreference(source);
+        }
     }
 
     private void addCategs(TreeMap<String, List<Publisher>> publisherCategories) {
@@ -241,7 +243,7 @@ public class BraveNewsPreferences extends BravePreferenceFragment
                     rssUrl, (isValidFeed, isDuplicate, result) -> {
                         if (isValidFeed && !isDuplicate && result != null) {
                             SharedPreferencesManager.getInstance().writeBoolean(
-                                BravePreferenceKeys.BRAVE_NEWS_CHANGE_SOURCE, true);
+                                    BravePreferenceKeys.BRAVE_NEWS_CHANGE_SOURCE, true);
                             getActivity().finish();
                             SettingsLauncher settingsLauncher = new SettingsLauncherImpl();
                             settingsLauncher.launchSettingsActivity(
