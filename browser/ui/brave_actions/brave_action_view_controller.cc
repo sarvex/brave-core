@@ -18,6 +18,7 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/themes/theme_properties.h"
 #include "chrome/browser/ui/browser.h"
+#include "chrome/browser/ui/extensions/extension_popup_types.h"
 #include "chrome/browser/ui/extensions/extensions_container.h"
 #include "chrome/browser/ui/toolbar/toolbar_action_view_delegate.h"
 #include "components/sessions/content/session_tab_helper.h"
@@ -88,7 +89,7 @@ ui::MenuModel* BraveActionViewController::GetContextMenu(
 }
 
 void BraveActionViewController::ExecuteActionUI(const std::string& relative_path) {
-  TriggerPopup(PopupShowAction::SHOW_POPUP, true);
+  TriggerPopup(PopupShowAction::kShow, true);
 }
 
 ExtensionActionViewController*
