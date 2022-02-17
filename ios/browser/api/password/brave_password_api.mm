@@ -96,9 +96,7 @@ PasswordFormScheme PasswordFormSchemeFromPasswordManagerScheme(
   if ((self = [super init])) {
     [self setUrl:url];
 
-    if (signOnRealm) {
-      [self setSignOnRealm:signOnRealm];
-    }
+    [self setSignOnRealm:signOnRealm];
 
     if (dateCreated) {
       [self setDateCreated:dateCreated];
@@ -177,7 +175,11 @@ PasswordFormScheme PasswordFormSchemeFromPasswordManagerScheme(
 }
 
 - (void)setSignOnRealm:(NSString*)signOnRealm {
-  signon_realm_ = base::SysNSStringToUTF8(signOnRealm);
+  if ([signOnRealm length] != 0) {
+    signon_realm_ = base::SysNSStringToUTF8(signOnRealm);
+  } else {
+    signon_realm_ = gurl_.spec();
+  }
 }
 
 - (NSString*)signOnRealm {

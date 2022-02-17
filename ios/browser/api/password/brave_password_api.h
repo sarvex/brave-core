@@ -29,7 +29,7 @@ OBJC_EXPORT
 @interface IOSPasswordForm : NSObject<NSCopying> 
 
 @property(nonatomic, strong) NSURL* url;
-@property(nonatomic, nullable, copy) NSString* signOnRealm;
+@property(nonatomic, strong) NSString* signOnRealm;
 @property(nonatomic, nullable, copy) NSDate* dateCreated;
 @property(nonatomic, nullable, copy) NSDate* dateLastUsed;
 @property(nonatomic, nullable, copy) NSDate* datePasswordChanged;
@@ -60,7 +60,7 @@ OBJC_EXPORT
 /// password input element
 /// @param passwordValue - The string represantation of the password
 - (instancetype)initWithURL:(NSURL*)url
-                signOnRealm:(nullable NSString*)signOnRealm
+                signOnRealm:(NSString*)signOnRealm
                 dateCreated:(nullable NSDate*)dateCreated
                dateLastUsed:(nullable NSDate*)dateLastUsed
         datePasswordChanged:(nullable NSDate*)datePasswordChanged
