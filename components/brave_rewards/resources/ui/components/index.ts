@@ -4,17 +4,12 @@
 
 import AdRowsDetails from './adRowsDetails'
 import Alert from './alert'
-import Amount from './amount'
 import Box from './box'
 import BoxAlert from './boxAlert'
 import CategoryLikePicker from './categoryLikePicker'
 import DisabledContent from './disabledContent'
-import GrantCaptcha from './grantCaptcha'
-import GrantClaim from './grantClaim'
 import GrantComplete from './grantComplete'
-import GrantError from './grantError'
 import GrantWrapper from './grantWrapper'
-import InfoCard from './infoCard'
 import List from './list'
 import ListToken from './listToken'
 import MainToggle from './mainToggle'
@@ -29,7 +24,6 @@ import ModalQRCode from './modalQRCode'
 import NextContribution from './nextContribution'
 import Profile from './profile'
 import RestoreSites from './restoreSites'
-import RewardsButton from './rewardsButton'
 import SettingsPage from './settingsPage'
 import ShowAdsHistory from './showAdsHistory'
 import SidebarPromo from './sidebarPromo'
@@ -40,28 +34,19 @@ import TableDonation from './tableDonation'
 import TablePending from './tablePending'
 import TableTransactions from './tableTransactions'
 import ThumbLikePicker from './thumbLikePicker'
-import ToggleTips from './toggleTips'
 import Tokens from './tokens'
 import Tooltip from './tooltip'
-import WalletEmpty from './walletEmpty'
-import WalletPopup from './walletPopup'
 import WalletSummary from './walletSummary'
-import WalletWrapper from './walletWrapper'
 
 export {
   AdRowsDetails,
   Alert,
-  Amount,
   Box,
   BoxAlert,
   CategoryLikePicker,
   DisabledContent,
-  GrantCaptcha,
-  GrantClaim,
   GrantComplete,
-  GrantError,
   GrantWrapper,
-  InfoCard,
   List,
   ListToken,
   MainToggle,
@@ -76,7 +61,6 @@ export {
   NextContribution,
   Profile,
   RestoreSites,
-  RewardsButton,
   SettingsPage,
   ShowAdsHistory,
   SidebarPromo,
@@ -87,11 +71,7 @@ export {
   TablePending,
   TableTransactions,
   ThumbLikePicker,
-  ToggleTips,
   Tokens,
   Tooltip,
-  WalletEmpty,
-  WalletPopup,
-  WalletSummary,
-  WalletWrapper
+  WalletSummary
 }

@@ -36,13 +36,13 @@ import { mockRPCResponse } from './mock-data/rpc-response'
 import { CurrentPriceMockData } from './mock-data/current-price-data'
 import { PriceHistoryMockData } from './mock-data/price-history-data'
 import { mockUserWalletPreferences } from './mock-data/user-wallet-preferences'
-import { formatWithCommasAndDecimals } from '../utils/format-prices'
 import { getLocale } from '../../common/locale'
 import {
   HardwareWalletConnectOpts
 } from '../components/desktop/popup-modals/add-account-modal/hardware-wallet-connect/types'
 import { mockNetworks } from './mock-data/mock-networks'
 import { isStrongPassword } from '../utils/password-utils'
+import Amount from '../utils/amount'
 export default {
   title: 'Wallet/Desktop',
   argTypes: {
@@ -56,19 +56,24 @@ export const transactionDummyData: AccountTransactions = {
     {
       fromAddress: '0x7d66c9ddAED3115d93Bd1790332f3Cd06Cf52B14',
       id: '13cf4882-d3c0-44cd-a8c2-aca1fcf85c4a',
-      txData: {
-        baseData: {
-          data: Array.from(new Uint8Array(24)),
-          gasLimit: '0xfde8',
-          gasPrice: '0x20000000000',
-          nonce: '0x1',
-          to: '0xcd3a3f8e0e4bdc174c9e2e63b4c22e15a7f7f92a',
-          value: '0xb1a2bc2ec50000'
+      txDataUnion: {
+        ethTxData1559: {
+          baseData: {
+            data: Array.from(new Uint8Array(24)),
+            gasLimit: '0xfde8',
+            gasPrice: '0x20000000000',
+            nonce: '0x1',
+            to: '0xcd3a3f8e0e4bdc174c9e2e63b4c22e15a7f7f92a',
+            value: '0xb1a2bc2ec50000'
+          },
+          chainId: '',
+          maxFeePerGas: '',
+          maxPriorityFeePerGas: '',
+          gasEstimation: undefined
         },
-        chainId: '',
-        maxFeePerGas: '',
-        maxPriorityFeePerGas: '',
-        gasEstimation: undefined
+        ethTxData: undefined,
+        solanaTxData: undefined,
+        filTxData: undefined
       },
       txHash: '0x55732e30af74a450cd438be2a02c765ea62cb4ec8dda5cb12ed8dc5d21ac15d3',
       txStatus: 3,
@@ -82,19 +87,24 @@ export const transactionDummyData: AccountTransactions = {
     {
       fromAddress: '0x7843981e0b96135073b26043ea24c950d4ec385b',
       id: '13cf4882-d3c0-44cd-a8c2-aca1fcf85c4a',
-      txData: {
-        baseData: {
-          data: Array.from(new Uint8Array(24)),
-          gasLimit: '0xfde8',
-          gasPrice: '0x20000000000',
-          nonce: '0x1',
-          to: '0x7d66c9ddAED3115d93Bd1790332f3Cd06Cf52B14',
-          value: '0xb1a2bc2ec90000'
+      txDataUnion: {
+        ethTxData1559: {
+          baseData: {
+            data: Array.from(new Uint8Array(24)),
+            gasLimit: '0xfde8',
+            gasPrice: '0x20000000000',
+            nonce: '0x1',
+            to: '0x7d66c9ddAED3115d93Bd1790332f3Cd06Cf52B14',
+            value: '0xb1a2bc2ec90000'
+          },
+          chainId: '',
+          maxFeePerGas: '',
+          maxPriorityFeePerGas: '',
+          gasEstimation: undefined
         },
-        chainId: '',
-        maxFeePerGas: '',
-        maxPriorityFeePerGas: '',
-        gasEstimation: undefined
+        ethTxData: undefined,
+        solanaTxData: undefined,
+        filTxData: undefined
       },
       txHash: '0x55732e30af74a450cd438be2a02c765ea62cb4ec8dda5cb12ed8dc5d21ac15d3',
       txStatus: 4,
@@ -108,19 +118,24 @@ export const transactionDummyData: AccountTransactions = {
     {
       fromAddress: '0x7d66c9ddAED3115d93Bd1790332f3Cd06Cf52B14',
       id: '13cf4882-d3c0-44cd-a8c2-aca1fcf85c4a',
-      txData: {
-        baseData: {
-          data: Array.from(new Uint8Array(24)),
-          gasLimit: '0xfde8',
-          gasPrice: '0x20000000000',
-          nonce: '0x1',
-          to: '0xcd3a3f8e0e4bdc174c9e2e63b4c22e15a7f7f92a',
-          value: '0xb1a2bc2ec90000'
+      txDataUnion: {
+        ethTxData1559: {
+          baseData: {
+            data: Array.from(new Uint8Array(24)),
+            gasLimit: '0xfde8',
+            gasPrice: '0x20000000000',
+            nonce: '0x1',
+            to: '0xcd3a3f8e0e4bdc174c9e2e63b4c22e15a7f7f92a',
+            value: '0xb1a2bc2ec90000'
+          },
+          chainId: '',
+          maxFeePerGas: '',
+          maxPriorityFeePerGas: '',
+          gasEstimation: undefined
         },
-        chainId: '',
-        maxFeePerGas: '',
-        maxPriorityFeePerGas: '',
-        gasEstimation: undefined
+        ethTxData: undefined,
+        solanaTxData: undefined,
+        filTxData: undefined
       },
       txHash: '0x55732e30af74a450cd438be2a02c765ea62cb4ec8dda5cb12ed8dc5d21ac15d3',
       txStatus: 2,
@@ -134,19 +149,24 @@ export const transactionDummyData: AccountTransactions = {
     {
       fromAddress: '0x7d66c9ddAED3115d93Bd1790332f3Cd06Cf52B14',
       id: '13cf4882-d3c0-44cd-a8c2-aca1fcf85c4a',
-      txData: {
-        baseData: {
-          data: Array.from(new Uint8Array(24)),
-          gasLimit: '0xfde8',
-          gasPrice: '0x20000000000',
-          nonce: '0x1',
-          to: '0xcd3a3f8e0e4bdc174c9e2e63b4c22e15a7f7f92a',
-          value: '0xb1a2bc2ec90000'
+      txDataUnion: {
+        ethTxData1559: {
+          baseData: {
+            data: Array.from(new Uint8Array(24)),
+            gasLimit: '0xfde8',
+            gasPrice: '0x20000000000',
+            nonce: '0x1',
+            to: '0xcd3a3f8e0e4bdc174c9e2e63b4c22e15a7f7f92a',
+            value: '0xb1a2bc2ec90000'
+          },
+          chainId: '',
+          maxFeePerGas: '',
+          maxPriorityFeePerGas: '',
+          gasEstimation: undefined
         },
-        chainId: '',
-        maxFeePerGas: '',
-        maxPriorityFeePerGas: '',
-        gasEstimation: undefined
+        ethTxData: undefined,
+        solanaTxData: undefined,
+        filTxData: undefined
       },
       txHash: '0x55732e30af74a450cd438be2a02c765ea62cb4ec8dda5cb12ed8dc5d21ac15d3',
       txStatus: 1,
@@ -162,19 +182,24 @@ export const transactionDummyData: AccountTransactions = {
     {
       fromAddress: '0x73A29A1da97149722eB09c526E4eAd698895bDCf',
       id: '13cf4882-d3c0-44cd-a8c2-aca1fcf85c4a',
-      txData: {
-        baseData: {
-          data: Array.from(new Uint8Array(24)),
-          gasLimit: '0xfde8',
-          gasPrice: '0x20000000000',
-          nonce: '0x1',
-          to: '0xcd3a3f8e0e4bdc174c9e2e63b4c22e15a7f7f92a',
-          value: '0xb1a2bc2ec90000'
+      txDataUnion: {
+        ethTxData1559: {
+          baseData: {
+            data: Array.from(new Uint8Array(24)),
+            gasLimit: '0xfde8',
+            gasPrice: '0x20000000000',
+            nonce: '0x1',
+            to: '0xcd3a3f8e0e4bdc174c9e2e63b4c22e15a7f7f92a',
+            value: '0xb1a2bc2ec90000'
+          },
+          chainId: '',
+          maxFeePerGas: '',
+          maxPriorityFeePerGas: '',
+          gasEstimation: undefined
         },
-        chainId: '',
-        maxFeePerGas: '',
-        maxPriorityFeePerGas: '',
-        gasEstimation: undefined
+        ethTxData: undefined,
+        solanaTxData: undefined,
+        filTxData: undefined
       },
       txHash: '0x55732e30af74a450cd438be2a02c765ea62cb4ec8dda5cb12ed8dc5d21ac15d3',
       txStatus: 0,
@@ -188,19 +213,24 @@ export const transactionDummyData: AccountTransactions = {
     {
       fromAddress: '0x73A29A1da97149722eB09c526E4eAd698895bDCf',
       id: '13cf4882-d3c0-44cd-a8c2-aca1fcf85c4a',
-      txData: {
-        baseData: {
-          data: Array.from(new Uint8Array(24)),
-          gasLimit: '0xfde8',
-          gasPrice: '0x20000000000',
-          nonce: '0x1',
-          to: '0xcd3a3f8e0e4bdc174c9e2e63b4c22e15a7f7f92a',
-          value: '0xb1a2bc2ec90000'
+      txDataUnion: {
+        ethTxData1559: {
+          baseData: {
+            data: Array.from(new Uint8Array(24)),
+            gasLimit: '0xfde8',
+            gasPrice: '0x20000000000',
+            nonce: '0x1',
+            to: '0xcd3a3f8e0e4bdc174c9e2e63b4c22e15a7f7f92a',
+            value: '0xb1a2bc2ec90000'
+          },
+          chainId: '',
+          maxFeePerGas: '',
+          maxPriorityFeePerGas: '',
+          gasEstimation: undefined
         },
-        chainId: '',
-        maxFeePerGas: '',
-        maxPriorityFeePerGas: '',
-        gasEstimation: undefined
+        ethTxData: undefined,
+        solanaTxData: undefined,
+        filTxData: undefined
       },
       txHash: '0x55732e30af74a450cd438be2a02c765ea62cb4ec8dda5cb12ed8dc5d21ac15d3',
       txStatus: 5,
@@ -220,6 +250,8 @@ export const _DesktopWalletConcept = (args: { onboarding: boolean, locked: boole
     locked
   } = args
   const [view] = React.useState<NavTypes>('crypto')
+  const [isFilecoinEnabled] = React.useState<boolean>(true)
+  const [isSolanaEnabled] = React.useState<boolean>(true)
   const [needsOnboarding, setNeedsOnboarding] = React.useState<boolean>(onboarding)
   const [walletLocked, setWalletLocked] = React.useState<boolean>(locked)
   const [needsBackup, setNeedsBackup] = React.useState<boolean>(true)
@@ -375,7 +407,8 @@ export const _DesktopWalletConcept = (args: { onboarding: boolean, locked: boole
         balance: singleAccountBalance(wallet),
         asset: selectedAsset ? selectedAsset.symbol : '',
         accountType: 'Primary',
-        tokenBalanceRegistry: {}
+        tokenBalanceRegistry: {},
+        coin: BraveWallet.CoinType.ETH
       } as WalletAccountType
     })
     return newList
@@ -421,7 +454,8 @@ export const _DesktopWalletConcept = (args: { onboarding: boolean, locked: boole
     const grandTotal = amountList.reduce(function (a, b) {
       return a + b
     }, 0)
-    return formatWithCommasAndDecimals(grandTotal.toString())
+    return new Amount(grandTotal)
+      .format(6, true)
   }
 
   // This will change once we hit a real api for pricing
@@ -459,7 +493,7 @@ export const _DesktopWalletConcept = (args: { onboarding: boolean, locked: boole
     alert(name)
   }
 
-  const onImportAccount = (name: string, key: string) => {
+  const onImportAccount = (name: string, key: string, coin: BraveWallet.CoinType) => {
     // doesnt do anything in storybook
   }
   const onImportFilecoinAccount = (accountName: string, privateKey: string, network: string, protocol: BraveWallet.FilecoinAddressProtocol) => {
@@ -692,8 +726,8 @@ export const _DesktopWalletConcept = (args: { onboarding: boolean, locked: boole
                   onSubmit={completeWalletSetup}
                   onPasswordProvided={passwordProvided}
                   onShowRestore={onToggleRestore}
-                  braveLegacyWalletDetected={true}
-                  metaMaskWalletDetected={true}
+                  isCryptoWalletsInitialized={true}
+                  isMetaMaskInitialized={true}
                   onImportMetaMask={onImportWallet}
                   onImportCryptoWallets={onImportWallet}
                   onSetImportError={onSetImportWalletError}
@@ -740,6 +774,8 @@ export const _DesktopWalletConcept = (args: { onboarding: boolean, locked: boole
                               userAssetList={userAssetList}
                               onCreateAccount={onCreateAccount}
                               onImportAccount={onImportAccount}
+                              isFilecoinEnabled={isFilecoinEnabled}
+                              isSolanaEnabled={isSolanaEnabled}
                               onImportFilecoinAccount={onImportFilecoinAccount}
                               onConnectHardwareWallet={onConnectHardwareWallet}
                               onAddHardwareAccounts={onAddHardwareAccounts}

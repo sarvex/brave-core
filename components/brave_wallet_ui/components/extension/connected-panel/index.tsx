@@ -5,13 +5,7 @@ import {
   ConnectedBottomNav,
   ConnectedHeader
 } from '../'
-import { Tooltip } from '../../shared'
-import {
-  formatFiatAmountWithCommasAndDecimals,
-  formatTokenAmountWithCommasAndDecimals
-} from '../../../utils/format-prices'
-import { formatBalance } from '../../../utils/format-balances'
-import { reduceAccountDisplayName } from '../../../utils/reduce-account-name'
+import { Tooltip, SelectNetworkButton } from '../../shared'
 
 // Styled Components
 import {
@@ -25,7 +19,6 @@ import {
   OvalButton,
   OvalButtonText,
   BigCheckMark,
-  CaratDownIcon,
   StatusRow,
   BalanceColumn,
   SwitchIcon,
@@ -34,8 +27,9 @@ import {
 
 // Utils
 import { reduceAddress } from '../../../utils/reduce-address'
-import { reduceNetworkDisplayName } from '../../../utils/network-utils'
 import { copyToClipboard } from '../../../utils/copy-to-clipboard'
+import { reduceAccountDisplayName } from '../../../utils/reduce-account-name'
+import Amount from '../../../utils/amount'
 
 // Hooks
 import { useExplorer, usePricing } from '../../../common/hooks'
@@ -45,7 +39,6 @@ import {
   PanelTypes,
   BraveWallet,
   BuySupportedChains,
-  WalletOrigin,
   DefaultCurrencies
 } from '../../../constants/types'
 import { create, background } from 'ethereum-blockies'
@@ -117,11 +110,9 @@ const ConnectedPanel = (props: Props) => {
     return !BuySupportedChains.includes(selectedNetwork.chainId)
   }, [BuySupportedChains, selectedNetwork])
 
-  const formattedAssetBalance = formatBalance(selectedAccount.balance, selectedNetwork.decimals)
-
-  const formattedAssetBalanceWithDecimals = selectedAccount.balance
-    ? formatTokenAmountWithCommasAndDecimals(formattedAssetBalance, selectedNetwork.symbol)
-    : ''
+  const formattedAssetBalance = new Amount(selectedAccount.balance)
+    .divideByDecimals(selectedNetwork.decimals)
+    .formatAsAsset(6, selectedNetwork.symbol)
 
   const { computeFiatAmount } = usePricing(spotPrices)
 
@@ -143,7 +134,7 @@ const ConnectedPanel = (props: Props) => {
       />
       <CenterColumn>
         <StatusRow>
-          {activeOrigin !== WalletOrigin ? (
+          {!activeOrigin.startsWith('chrome://') ? (
             <OvalButton onClick={onShowSitePermissions}>
               {isConnected && <BigCheckMark />}
               <OvalButtonText>{isConnected ? getLocale('braveWalletPanelConnected') : getLocale('braveWalletPanelNotConnected')}</OvalButtonText>
@@ -155,10 +146,11 @@ const ConnectedPanel = (props: Props) => {
             text={selectedNetwork.chainName}
             positionRight={true}
           >
-            <OvalButton onClick={navigate('networks')}>
-              <OvalButtonText>{reduceNetworkDisplayName(selectedNetwork.chainName)}</OvalButtonText>
-              <CaratDownIcon />
-            </OvalButton>
+            <SelectNetworkButton
+              onClick={navigate('networks')}
+              selectedNetwork={selectedNetwork}
+              isPanel={true}
+            />
           </Tooltip>
         </StatusRow>
         <BalanceColumn>
@@ -171,8 +163,10 @@ const ConnectedPanel = (props: Props) => {
           </Tooltip>
         </BalanceColumn>
         <BalanceColumn>
-          <AssetBalanceText>{formattedAssetBalanceWithDecimals}</AssetBalanceText>
-          <FiatBalanceText>{formatFiatAmountWithCommasAndDecimals(selectedAccountFiatBalance, defaultCurrencies.fiat)}</FiatBalanceText>
+          <AssetBalanceText>{formattedAssetBalance}</AssetBalanceText>
+          <FiatBalanceText>
+            {selectedAccountFiatBalance.formatAsFiat(defaultCurrencies.fiat)}
+          </FiatBalanceText>
         </BalanceColumn>
         <MoreAssetsButton onClick={navigate('assets')}>{getLocale('braveWalletPanelViewAccountAssets')}</MoreAssetsButton>
       </CenterColumn>

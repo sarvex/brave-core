@@ -14,12 +14,8 @@ import { getLocale } from '../../../../../common/locale'
 import { CurrencySymbols } from '../../../../utils/currency-symbols'
 
 // Utils
-import {
-  formatWithCommasAndDecimals,
-  formatTokenAmountWithCommasAndDecimals
-} from '../../../../utils/format-prices'
 import { sortTransactionByDate } from '../../../../utils/tx-utils'
-import { formatBalance } from '../../../../utils/format-balances'
+import Amount from '../../../../utils/amount'
 
 // Options
 import { ChartTimelineOptions } from '../../../../options/chart-timeline-options'
@@ -30,7 +26,8 @@ import {
   ChartControlBar,
   LineChart,
   SelectNetworkDropdown,
-  EditVisibleAssetsModal
+  EditVisibleAssetsModal,
+  WithHideBalancePlaceholder
 } from '../../'
 
 // import NFTDetails from './components/nft-details'
@@ -56,7 +53,8 @@ import {
   PercentBubble,
   PercentText,
   ArrowIcon,
-  BalanceRow
+  BalanceRow,
+  ShowBalanceButton
 } from './style'
 
 export interface Props {
@@ -141,6 +139,7 @@ const Portfolio = (props: Props) => {
   const [hoverBalance, setHoverBalance] = React.useState<string>()
   const [hoverPrice, setHoverPrice] = React.useState<string>()
   const [showNetworkDropdown, setShowNetworkDropdown] = React.useState<boolean>(false)
+  const [hideBalances, setHideBalances] = React.useState<boolean>(false)
   const parseTransaction = useTransactionParser(selectedNetwork, accounts, transactionSpotPrices, userVisibleTokensInfo)
 
   const toggleShowNetworkDropdown = () => {
@@ -179,13 +178,13 @@ const Portfolio = (props: Props) => {
   const onUpdateBalance = (value: number | undefined) => {
     if (!selectedAsset) {
       if (value) {
-        setHoverBalance(formatWithCommasAndDecimals(value.toString()))
+        setHoverBalance(new Amount(value).formatAsFiat())
       } else {
         setHoverBalance(undefined)
       }
     } else {
       if (value) {
-        setHoverPrice(formatWithCommasAndDecimals(value.toString()))
+        setHoverPrice(new Amount(value).formatAsFiat())
       } else {
         setHoverPrice(undefined)
       }
@@ -233,10 +232,9 @@ const Portfolio = (props: Props) => {
   }, [])
 
   const formattedFullAssetBalance = fullAssetBalances?.assetBalance
-    ? '(' + formatTokenAmountWithCommasAndDecimals(
-      formatBalance(fullAssetBalances?.assetBalance ?? '', selectedAsset?.decimals ?? 18),
-      selectedAsset?.symbol ?? ''
-    ) + ')'
+    ? '(' + new Amount(fullAssetBalances?.assetBalance ?? '')
+      .divideByDecimals(selectedAsset?.decimals ?? 18)
+      .formatAsAsset(6, selectedAsset?.symbol ?? '') + ')'
     : ''
 
   const { computeFiatAmount } = usePricing(transactionSpotPrices)
@@ -246,7 +244,11 @@ const Portfolio = (props: Props) => {
       fullAssetBalances.asset.symbol,
       fullAssetBalances.asset.decimals
     )
-    : ''
+    : Amount.empty()
+
+  const onToggleHideBalances = () => {
+    setHideBalances(!hideBalances)
+  }
 
   return (
     <StyledWrapper onClick={onHideNetworkDropdown}>
@@ -267,18 +269,27 @@ const Portfolio = (props: Props) => {
             />
           }
         </BalanceRow>
-        {!selectedAsset?.isErc721 &&
-          <ChartControlBar
-            onSubmit={onChangeTimeline}
-            selectedTimeline={selectedAsset ? selectedTimeline : selectedPortfolioTimeline}
-            timelineOptions={ChartTimelineOptions()}
+        <BalanceRow>
+          {!selectedAsset?.isErc721 &&
+            <ChartControlBar
+              onSubmit={onChangeTimeline}
+              selectedTimeline={selectedAsset ? selectedTimeline : selectedPortfolioTimeline}
+              timelineOptions={ChartTimelineOptions()}
+            />
+          }
+          <ShowBalanceButton
+            hideBalances={hideBalances}
+            onClick={onToggleHideBalances}
           />
-        }
+        </BalanceRow>
       </TopRow>
       {!selectedAsset ? (
-        <>
+        <WithHideBalancePlaceholder
+          size='big'
+          hideBalances={hideBalances}
+        >
           <BalanceText>{fullPortfolioFiatBalance !== '' ? CurrencySymbols[defaultCurrencies.fiat] : ''}{hoverBalance || fullPortfolioFiatBalance}</BalanceText>
-        </>
+        </WithHideBalancePlaceholder>
       ) : (
         <>
           {!selectedAsset.isErc721 &&
@@ -289,13 +300,20 @@ const Portfolio = (props: Props) => {
               </AssetRow>
               <DetailText>{selectedAsset.name} {getLocale('braveWalletPrice')} ({selectedAsset.symbol})</DetailText>
               <PriceRow>
-                <PriceText>{CurrencySymbols[defaultCurrencies.fiat]}{hoverPrice || (selectedAssetFiatPrice ? formatWithCommasAndDecimals(selectedAssetFiatPrice.price) : 0.00)}</PriceText>
+                <PriceText>{CurrencySymbols[defaultCurrencies.fiat]}{hoverPrice || (selectedAssetFiatPrice ? new Amount(selectedAssetFiatPrice.price).formatAsFiat() : 0.00)}</PriceText>
                 <PercentBubble isDown={selectedAssetFiatPrice ? Number(selectedAssetFiatPrice.assetTimeframeChange) < 0 : false}>
                   <ArrowIcon isDown={selectedAssetFiatPrice ? Number(selectedAssetFiatPrice.assetTimeframeChange) < 0 : false} />
                   <PercentText>{selectedAssetFiatPrice ? Number(selectedAssetFiatPrice.assetTimeframeChange).toFixed(2) : 0.00}%</PercentText>
                 </PercentBubble>
               </PriceRow>
-              <DetailText>{selectedAssetCryptoPrice ? formatWithCommasAndDecimals(selectedAssetCryptoPrice.price) : ''} {defaultCurrencies.crypto}</DetailText>
+              <DetailText>
+                {
+                  selectedAssetCryptoPrice
+                    ? new Amount(selectedAssetCryptoPrice.price)
+                      .formatAsAsset(undefined, defaultCurrencies.crypto)
+                    : ''
+                }
+              </DetailText>
             </InfoColumn>
           }
         </>
@@ -337,6 +355,7 @@ const Portfolio = (props: Props) => {
         onCancelTransaction={onCancelTransaction}
         onRetryTransaction={onRetryTransaction}
         onSpeedupTransaction={onSpeedupTransaction}
+        hideBalances={hideBalances}
       />
       {!selectedAsset &&
         <TokenLists
@@ -344,9 +363,11 @@ const Portfolio = (props: Props) => {
           userAssetList={userAssetList}
           filteredAssetList={filteredAssetList}
           tokenPrices={transactionSpotPrices}
+          selectedNetwork={selectedNetwork}
           onSetFilteredAssetList={onSetFilteredAssetList}
           onSelectAsset={selectAsset}
           onShowAssetModal={toggleShowVisibleAssetModal}
+          hideBalances={hideBalances}
         />
       }
       {showVisibleAssetsModal &&

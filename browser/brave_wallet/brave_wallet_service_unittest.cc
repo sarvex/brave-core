@@ -4,23 +4,24 @@
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "brave/components/brave_wallet/browser/brave_wallet_service.h"
+#include <string>
 
 #include "base/memory/raw_ptr.h"
 #include "base/test/bind.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/time/time.h"
-#include "brave/browser/brave_wallet/eth_tx_service_factory.h"
 #include "brave/browser/brave_wallet/json_rpc_service_factory.h"
 #include "brave/browser/brave_wallet/keyring_service_factory.h"
+#include "brave/browser/brave_wallet/tx_service_factory.h"
 #include "brave/components/brave_wallet/browser/blockchain_list_parser.h"
 #include "brave/components/brave_wallet/browser/blockchain_registry.h"
 #include "brave/components/brave_wallet/browser/brave_wallet_service_delegate.h"
 #include "brave/components/brave_wallet/browser/brave_wallet_utils.h"
-#include "brave/components/brave_wallet/browser/eth_tx_service.h"
 #include "brave/components/brave_wallet/browser/json_rpc_service.h"
 #include "brave/components/brave_wallet/browser/keyring_service.h"
 #include "brave/components/brave_wallet/browser/pref_names.h"
+#include "brave/components/brave_wallet/browser/tx_service.h"
 #include "brave/components/brave_wallet/common/brave_wallet.mojom.h"
 #include "brave/components/brave_wallet/common/features.h"
 #include "chrome/browser/prefs/browser_prefs.h"
@@ -178,10 +179,10 @@ class BraveWalletServiceUnitTest : public testing::Test {
         KeyringServiceFactory::GetServiceForContext(profile_.get());
     json_rpc_service_ =
         JsonRpcServiceFactory::GetServiceForContext(profile_.get());
-    eth_tx_service_ = EthTxServiceFactory::GetServiceForContext(profile_.get());
+    tx_service = TxServiceFactory::GetServiceForContext(profile_.get());
     service_.reset(new BraveWalletService(
         BraveWalletServiceDelegate::Create(profile_.get()), keyring_service_,
-        json_rpc_service_, eth_tx_service_, GetPrefs()));
+        json_rpc_service_, tx_service, GetPrefs()));
     observer_.reset(new TestBraveWalletServiceObserver());
     service_->AddObserver(observer_->GetReceiver());
 
@@ -534,7 +535,7 @@ class BraveWalletServiceUnitTest : public testing::Test {
   std::unique_ptr<BraveWalletService> service_;
   raw_ptr<KeyringService> keyring_service_ = nullptr;
   JsonRpcService* json_rpc_service_;
-  EthTxService* eth_tx_service_;
+  TxService* tx_service;
   std::unique_ptr<TestBraveWalletServiceObserver> observer_;
   base::test::ScopedFeatureList scoped_feature_list_;
 
@@ -1037,7 +1038,7 @@ TEST_F(BraveWalletServiceUnitTest, NetworkListChangedEvent) {
   observer_->Reset();
   {
     ListPrefUpdate update(GetPrefs(), kBraveWalletCustomNetworks);
-    base::ListValue* list = update.Get();
+    base::Value* list = update.Get();
     list->EraseListValueIf([&](const base::Value& v) {
       auto* chain_id_value = v.FindStringKey("chainId");
       if (!chain_id_value)
@@ -1172,7 +1173,7 @@ TEST_F(BraveWalletServiceUnitTest, MigrateUserAssetEthContractAddress) {
       GetPrefs()->GetBoolean(kBraveWalletUserAssetEthContractAddressMigrated));
 
   DictionaryPrefUpdate update(GetPrefs(), kBraveWalletUserAssets);
-  base::DictionaryValue* user_assets_pref = update.Get();
+  base::Value* user_assets_pref = update.Get();
   base::Value* user_assets_list =
       user_assets_pref->SetKey("rinkeby", base::Value(base::Value::Type::LIST));
 
@@ -1315,7 +1316,8 @@ TEST_F(BraveWalletServiceUnitTest, SignMessageHardware) {
   std::string address = "0xbe862ad9abfe6f22bcb087716c7d89a26051f74c";
   std::string message = "0xAB";
   auto request1 = mojom::SignMessageRequest::New(
-      1, address, std::string(message.begin(), message.end()));
+      1, address, std::string(message.begin(), message.end()), false,
+      absl::nullopt, absl::nullopt);
   bool callback_is_called = false;
   service_->AddSignMessageRequest(
       std::move(request1), base::BindLambdaForTesting(
@@ -1337,7 +1339,8 @@ TEST_F(BraveWalletServiceUnitTest, SignMessageHardware) {
   callback_is_called = false;
   std::string expected_error = "error";
   auto request2 = mojom::SignMessageRequest::New(
-      2, address, std::string(message.begin(), message.end()));
+      2, address, std::string(message.begin(), message.end()), false,
+      absl::nullopt, absl::nullopt);
   service_->AddSignMessageRequest(
       std::move(request2), base::BindLambdaForTesting(
                                [&](bool approved, const std::string& signature,
@@ -1359,7 +1362,8 @@ TEST_F(BraveWalletServiceUnitTest, SignMessage) {
   std::string address = "0xbe862ad9abfe6f22bcb087716c7d89a26051f74c";
   std::string message = "0xAB";
   auto request1 = mojom::SignMessageRequest::New(
-      1, address, std::string(message.begin(), message.end()));
+      1, address, std::string(message.begin(), message.end()), false,
+      absl::nullopt, absl::nullopt);
   bool callback_is_called = false;
   service_->AddSignMessageRequest(
       std::move(request1), base::BindLambdaForTesting(
@@ -1377,7 +1381,8 @@ TEST_F(BraveWalletServiceUnitTest, SignMessage) {
   callback_is_called = false;
   std::string expected_error = "error";
   auto request2 = mojom::SignMessageRequest::New(
-      2, address, std::string(message.begin(), message.end()));
+      2, address, std::string(message.begin(), message.end()), false,
+      absl::nullopt, absl::nullopt);
   service_->AddSignMessageRequest(
       std::move(request2), base::BindLambdaForTesting(
                                [&](bool approved, const std::string& signature,
@@ -1569,7 +1574,8 @@ TEST_F(BraveWalletServiceUnitTest, Reset) {
   std::string address = "0xbe862ad9abfe6f22bcb087716c7d89a26051f74c";
   std::string message = "0xAB";
   auto request1 = mojom::SignMessageRequest::New(
-      1, address, std::string(message.begin(), message.end()));
+      1, address, std::string(message.begin(), message.end()), false,
+      absl::nullopt, absl::nullopt);
   service_->AddSignMessageRequest(
       std::move(request1),
       base::BindLambdaForTesting(

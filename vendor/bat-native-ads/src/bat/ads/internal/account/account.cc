@@ -12,24 +12,25 @@
 #include "bat/ads/internal/account/confirmations/confirmation_info.h"
 #include "bat/ads/internal/account/confirmations/confirmations.h"
 #include "bat/ads/internal/account/confirmations/confirmations_state.h"
+#include "bat/ads/internal/account/deposits/deposit_base.h"
+#include "bat/ads/internal/account/deposits/deposits_factory.h"
+#include "bat/ads/internal/account/issuers/issuer_types.h"
+#include "bat/ads/internal/account/issuers/issuers.h"
+#include "bat/ads/internal/account/issuers/issuers_info.h"
+#include "bat/ads/internal/account/issuers/issuers_util.h"
+#include "bat/ads/internal/account/redeem_unblinded_payment_tokens/redeem_unblinded_payment_tokens.h"
+#include "bat/ads/internal/account/refill_unblinded_tokens/refill_unblinded_tokens.h"
 #include "bat/ads/internal/account/statement/statement.h"
 #include "bat/ads/internal/account/transactions/transactions.h"
 #include "bat/ads/internal/account/wallet/wallet.h"
 #include "bat/ads/internal/account/wallet/wallet_info.h"
 #include "bat/ads/internal/ads_client_helper.h"
 #include "bat/ads/internal/bundle/creative_ad_info.h"
-#include "bat/ads/internal/database/tables/creative_ads_database_table.h"
 #include "bat/ads/internal/database/tables/transactions_database_table.h"
 #include "bat/ads/internal/database/tables/transactions_database_table_aliases.h"
 #include "bat/ads/internal/logging.h"
 #include "bat/ads/internal/privacy/tokens/token_generator_interface.h"
 #include "bat/ads/internal/privacy/unblinded_tokens/unblinded_tokens.h"
-#include "bat/ads/internal/tokens/issuers/issuer_types.h"
-#include "bat/ads/internal/tokens/issuers/issuers.h"
-#include "bat/ads/internal/tokens/issuers/issuers_info.h"
-#include "bat/ads/internal/tokens/issuers/issuers_util.h"
-#include "bat/ads/internal/tokens/redeem_unblinded_payment_tokens/redeem_unblinded_payment_tokens.h"
-#include "bat/ads/internal/tokens/refill_unblinded_tokens/refill_unblinded_tokens.h"
 #include "bat/ads/pref_names.h"
 #include "bat/ads/statement_info.h"
 #include "bat/ads/transaction_info.h"
@@ -37,23 +38,20 @@
 namespace ads {
 
 Account::Account(privacy::TokenGeneratorInterface* token_generator)
-    : issuers_(std::make_unique<Issuers>()),
-      confirmations_(std::make_unique<Confirmations>(token_generator)),
+    : confirmations_(std::make_unique<Confirmations>(token_generator)),
+      issuers_(std::make_unique<Issuers>()),
       redeem_unblinded_payment_tokens_(
           std::make_unique<RedeemUnblindedPaymentTokens>()),
       refill_unblinded_tokens_(
           std::make_unique<RefillUnblindedTokens>(token_generator)),
       wallet_(std::make_unique<Wallet>()) {
-  confirmations_->AddObserver(this);
-
+  confirmations_->set_delegate(this);
   issuers_->set_delegate(this);
   redeem_unblinded_payment_tokens_->set_delegate(this);
   refill_unblinded_tokens_->set_delegate(this);
 }
 
-Account::~Account() {
-  confirmations_->RemoveObserver(this);
-}
+Account::~Account() = default;
 
 void Account::AddObserver(AccountObserver* observer) {
   DCHECK(observer);
@@ -98,24 +96,26 @@ void Account::MaybeGetIssuers() const {
   issuers_->MaybeFetch();
 }
 
-void Account::DepositFunds(const std::string& creative_instance_id,
-                           const AdType& ad_type,
-                           const ConfirmationType& confirmation_type) {
+void Account::Deposit(const std::string& creative_instance_id,
+                      const AdType& ad_type,
+                      const ConfirmationType& confirmation_type) {
   DCHECK(!creative_instance_id.empty());
   DCHECK_NE(AdType::kUndefined, ad_type.value());
   DCHECK_NE(ConfirmationType::kUndefined, confirmation_type.value());
 
-  database::table::CreativeAds database_table;
-  database_table.GetForCreativeInstanceId(
-      creative_instance_id,
-      [=](const bool success, const std::string& creative_instance_id,
-          const CreativeAdInfo& creative_ad) {
+  std::unique_ptr<DepositBase> deposit =
+      DepositsFactory::Build(confirmation_type);
+  DCHECK(deposit);
+
+  deposit->GetValue(
+      creative_instance_id, [=](const bool success, const double value) {
         if (!success) {
-          NotifyFailedToDepositFunds(creative_ad, ad_type, confirmation_type);
+          NotifyFailedToProcessDeposit(creative_instance_id, ad_type,
+                                       confirmation_type);
           return;
         }
 
-        Credit(creative_ad, ad_type, confirmation_type);
+        ProcessDeposit(creative_instance_id, ad_type, confirmation_type, value);
       });
 }
 
@@ -138,26 +138,30 @@ void Account::ProcessClearingCycle() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void Account::Credit(const CreativeAdInfo& creative_ad,
-                     const AdType& ad_type,
-                     const ConfirmationType& confirmation_type) const {
-  const double value =
-      confirmation_type == ConfirmationType::kViewed ? creative_ad.value : 0.0;
-
+void Account::ProcessDeposit(const std::string& creative_instance_id,
+                             const AdType& ad_type,
+                             const ConfirmationType& confirmation_type,
+                             const double value) const {
   transactions::Add(
-      creative_ad.creative_instance_id, value, ad_type, confirmation_type,
+      creative_instance_id, value, ad_type, confirmation_type,
       [=](const bool success, const TransactionInfo& transaction) {
         if (!success) {
-          NotifyFailedToDepositFunds(creative_ad, ad_type, confirmation_type);
+          NotifyFailedToProcessDeposit(creative_instance_id, ad_type,
+                                       confirmation_type);
           return;
         }
 
-        NotifyDepositedFunds(transaction);
+        NotifyDidProcessDeposit(transaction);
 
         NotifyStatementOfAccountsDidChange();
 
         confirmations_->Confirm(transaction);
       });
+}
+
+void Account::ProcessUnclearedTransactions() {
+  const WalletInfo& wallet = GetWallet();
+  redeem_unblinded_payment_tokens_->MaybeRedeemAfterDelay(wallet);
 }
 
 void Account::TopUpUnblindedTokens() {
@@ -167,11 +171,6 @@ void Account::TopUpUnblindedTokens() {
 
   const WalletInfo& wallet = GetWallet();
   refill_unblinded_tokens_->MaybeRefill(wallet);
-}
-
-void Account::ProcessUnclearedTransactions() {
-  const WalletInfo& wallet = GetWallet();
-  redeem_unblinded_payment_tokens_->MaybeRedeemAfterDelay(wallet);
 }
 
 void Account::Reset() {
@@ -205,18 +204,20 @@ void Account::NotifyInvalidWallet() const {
   }
 }
 
-void Account::NotifyDepositedFunds(const TransactionInfo& transaction) const {
+void Account::NotifyDidProcessDeposit(
+    const TransactionInfo& transaction) const {
   for (AccountObserver& observer : observers_) {
-    observer.OnDepositedFunds(transaction);
+    observer.OnDidProcessDeposit(transaction);
   }
 }
 
-void Account::NotifyFailedToDepositFunds(
-    const CreativeAdInfo& creative_ad,
+void Account::NotifyFailedToProcessDeposit(
+    const std::string& creative_instance_id,
     const AdType& ad_type,
     const ConfirmationType& confirmation_type) const {
   for (AccountObserver& observer : observers_) {
-    observer.OnFailedToDepositFunds(creative_ad, ad_type, confirmation_type);
+    observer.OnFailedToProcessDeposit(creative_instance_id, ad_type,
+                                      confirmation_type);
   }
 }
 
@@ -224,6 +225,18 @@ void Account::NotifyStatementOfAccountsDidChange() const {
   for (AccountObserver& observer : observers_) {
     observer.OnStatementOfAccountsDidChange();
   }
+}
+
+void Account::OnDidConfirm(const ConfirmationInfo& confirmation) {
+  DCHECK(confirmation.IsValid());
+
+  TopUpUnblindedTokens();
+}
+
+void Account::OnFailedToConfirm(const ConfirmationInfo& confirmation) {
+  DCHECK(confirmation.IsValid());
+
+  TopUpUnblindedTokens();
 }
 
 void Account::OnDidGetIssuers(const IssuersInfo& issuers) {
@@ -252,18 +265,6 @@ void Account::OnDidGetIssuers(const IssuersInfo& issuers) {
 
 void Account::OnFailedToGetIssuers() {
   BLOG(0, "Failed to get issuers");
-}
-
-void Account::OnDidConfirm(const ConfirmationInfo& confirmation) {
-  DCHECK(confirmation.IsValid());
-
-  TopUpUnblindedTokens();
-}
-
-void Account::OnFailedToConfirm(const ConfirmationInfo& confirmation) {
-  DCHECK(confirmation.IsValid());
-
-  TopUpUnblindedTokens();
 }
 
 void Account::OnDidRedeemUnblindedPaymentTokens(

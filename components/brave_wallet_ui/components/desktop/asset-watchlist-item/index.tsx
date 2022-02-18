@@ -2,7 +2,9 @@ import * as React from 'react'
 import { Checkbox } from 'brave-ui'
 import { BraveWallet } from '../../../constants/types'
 import { withPlaceholderIcon } from '../../shared'
-import { hexToNumber } from '../../../utils/format-balances'
+
+// Utils
+import Amount from '../../../utils/amount'
 
 // Styled Components
 import {
@@ -38,6 +40,10 @@ const AssetWatchlistItem = (props: Props) => {
     onSelectAsset(key, selected, token, isCustom)
   }
 
+  const onClickAsset = () => {
+    onSelectAsset(token.contractAddress, !isSelected, token, isCustom)
+  }
+
   const onClickRemoveAsset = () => {
     onRemoveAsset(token)
   }
@@ -48,10 +54,16 @@ const AssetWatchlistItem = (props: Props) => {
 
   return (
     <StyledWrapper>
-      <NameAndIcon>
+      <NameAndIcon onClick={onClickAsset}>
         <AssetIconWithPlaceholder selectedAsset={token} />
         <NameAndSymbol>
-          <AssetName>{token.name} {token.isErc721 ? hexToNumber(token.tokenId ?? '') : ''}</AssetName>
+          <AssetName>
+            {token.name} {
+              token.isErc721 && token.tokenId
+                ? '#' + new Amount(token.tokenId).toNumber()
+                : ''
+            }
+          </AssetName>
           <AssetSymbol>{token.symbol}</AssetSymbol>
         </NameAndSymbol>
       </NameAndIcon>

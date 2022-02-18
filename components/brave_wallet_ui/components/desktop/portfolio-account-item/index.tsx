@@ -7,16 +7,12 @@ import { useExplorer, usePricing } from '../../../common/hooks'
 // Utils
 import { reduceAddress } from '../../../utils/reduce-address'
 import { copyToClipboard } from '../../../utils/copy-to-clipboard'
-import {
-  formatFiatAmountWithCommasAndDecimals,
-  formatTokenAmountWithCommasAndDecimals
-} from '../../../utils/format-prices'
-import { formatBalance } from '../../../utils/format-balances'
+import Amount from '../../../utils/amount'
 
 import { Tooltip } from '../../shared'
 import { getLocale } from '../../../../common/locale'
 import { BraveWallet, DefaultCurrencies } from '../../../constants/types'
-import { TransactionPopup } from '../'
+import { TransactionPopup, WithHideBalancePlaceholder } from '../'
 
 // Styled Components
 import {
@@ -44,6 +40,7 @@ export interface Props {
   assetDecimals: number
   selectedNetwork: BraveWallet.EthereumChain
   name: string
+  hideBalances?: boolean
 }
 
 const PortfolioAccountItem = (props: Props) => {
@@ -55,6 +52,7 @@ const PortfolioAccountItem = (props: Props) => {
     assetDecimals,
     selectedNetwork,
     defaultCurrencies,
+    hideBalances,
     spotPrices
   } = props
   const [showAccountPopup, setShowAccountPopup] = React.useState<boolean>(false)
@@ -68,7 +66,9 @@ const PortfolioAccountItem = (props: Props) => {
 
   const onClickViewOnBlockExplorer = useExplorer(selectedNetwork)
 
-  const formattedAssetBalance = formatBalance(assetBalance, assetDecimals)
+  const formattedAssetBalance = new Amount(assetBalance)
+    .divideByDecimals(assetDecimals)
+    .format(6, true)
 
   const { computeFiatAmount } = usePricing(spotPrices)
   const fiatBalance = React.useMemo(() => {
@@ -98,8 +98,15 @@ const PortfolioAccountItem = (props: Props) => {
       </NameAndIcon>
       <RightSide>
         <BalanceColumn>
-          <FiatBalanceText>{formatFiatAmountWithCommasAndDecimals(fiatBalance, defaultCurrencies.fiat)}</FiatBalanceText>
-          <AssetBalanceText>{formatTokenAmountWithCommasAndDecimals(formattedAssetBalance, assetTicker)}</AssetBalanceText>
+          <WithHideBalancePlaceholder
+            size='small'
+            hideBalances={hideBalances ?? false}
+          >
+            <FiatBalanceText>
+              {fiatBalance.formatAsFiat(defaultCurrencies.fiat)}
+            </FiatBalanceText>
+            <AssetBalanceText>{`${formattedAssetBalance} ${assetTicker}`}</AssetBalanceText>
+          </WithHideBalancePlaceholder>
         </BalanceColumn>
         <MoreButton onClick={onShowTransactionPopup}>
           <MoreIcon />

@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "build/build_config.h"
 #include "components/sessions/core/session_id.h"
@@ -65,8 +66,7 @@ class AdsTabHelper : public content::WebContentsObserver,
   // content::WebContentsObserver overrides
   void DidFinishNavigation(
       content::NavigationHandle* navigation_handle) override;
-  void DocumentOnLoadCompletedInMainFrame(
-      content::RenderFrameHost* render_frame_host) override;
+  void DocumentOnLoadCompletedInPrimaryMainFrame() override;
   void DidFinishLoad(content::RenderFrameHost* render_frame_host,
                      const GURL& validated_url) override;
   void MediaStartedPlaying(const MediaPlayerInfo& video_type,
@@ -85,13 +85,11 @@ class AdsTabHelper : public content::WebContentsObserver,
 #endif
 
   SessionID tab_id_;
-  AdsService* ads_service_ = nullptr;  // NOT OWNED
+  raw_ptr<AdsService> ads_service_ = nullptr;  // NOT OWNED
   bool is_active_ = false;
   bool is_browser_active_ = true;
   std::vector<GURL> redirect_chain_;
   bool should_process_ = false;
-  uint32_t html_hash_ = 0;
-  uint32_t text_hash_ = 0;
 
   base::WeakPtrFactory<AdsTabHelper> weak_factory_;
   WEB_CONTENTS_USER_DATA_KEY_DECL();

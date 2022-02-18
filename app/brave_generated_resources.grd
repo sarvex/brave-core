@@ -502,7 +502,7 @@ Or change later at <ph name="SETTINGS_EXTENIONS_LINK">$2<ex>brave://settings/ext
         Publish and retrieve files from IPFS
       </message>
       <message name="IDS_LOCATION_BAR_ONION_AVAILABLE" desc="Button in location bar to indicate onion available site to open a new tab in tor window.">
-        Onion Available
+        .onion
       </message>
       <message name="IDS_LOCATION_BAR_ONION_AVAILABLE_TOOLTIP_TEXT" desc="The tooltip text for onion available button.">
         Open using .onion address
@@ -547,11 +547,23 @@ Or change later at <ph name="SETTINGS_EXTENIONS_LINK">$2<ex>brave://settings/ext
         <message name="IDS_CONTENT_CONTEXT_OPENLINKTOR_INAPP" desc="Title case: The name of the open a link in private window with Tor command">
           Open Link in Brave Private Window with Tor
         </message>
-        <message name="IDS_APP_MENU_IPFS_IMPORT_LOCAL_FILE" desc="Title case: The text label of a menu item to share local file using IPFS.">
-          Share Local File Using IPFS
+        <message name="IDS_APP_MENU_IPFS_SHARE_LOCAL_FILE" desc="Title case: The text label of a menu item to share local file using IPFS.">
+          Import and Share a File
         </message>
-        <message name="IDS_APP_MENU_IPFS_IMPORT_LOCAL_FOLDER" desc="Title case: The text label of a menu item to share local fodler using IPFS.">
-          Share Local Folder Using IPFS
+        <message name="IDS_APP_MENU_IPFS_OPEN_FILES" desc="Title case: The text label of a menu item to open IPFS webui files page.">
+          Open Files
+        </message>
+        <message name="IDS_APP_MENU_IPFS_SHARE_LOCAL_FOLDER" desc="Title case: The text label of a menu item to share local fodler using IPFS.">
+          Import and Share a Directory
+        </message>
+        <message name="IDS_APP_MENU_IPFS_PUBLISH_LOCAL_FILE" desc="Title case: The text label of a menu item to publish local file under IPFS key.">
+          With a File
+        </message>
+        <message name="IDS_APP_MENU_IPFS_PUBLISH_LOCAL_FOLDER" desc="Title case: The text label of a menu item to publish local fodler under IPFS key.">
+          With a Directory
+        </message>
+        <message name="IDS_APP_MENU_IPFS_UPDATE_IPNS" desc="Title case: The text label of a menu item to update IPNS.">
+          Update IPNS
         </message>
       </if>
       <if expr="not use_titlecase">
@@ -561,8 +573,14 @@ Or change later at <ph name="SETTINGS_EXTENIONS_LINK">$2<ex>brave://settings/ext
         <message name="IDS_IMPORT_WITHOUT_PUBLISHING" desc="The name of the IPFS context menu item to import content without publishing">
           Import and copy link to IPFS snapshot
         </message>
-        <message name="IDS_APP_MENU_IPFS_IMPORT_LOCAL_FILE" desc="The text label of a menu item to share local file using IPFS.">
-          Share local file using IPFS
+        <message name="IDS_APP_MENU_IPFS_SHARE_LOCAL_FILE" desc="The text label of a menu item to share local file using IPFS.">
+          Import and share a file
+        </message>
+        <message name="IDS_APP_MENU_IPFS_OPEN_FILES" desc="Title case: The text label of a menu item to open IPFS webui files page.">
+          Open files
+        </message>
+        <message name="IDS_APP_MENU_IPFS_UPDATE_IPNS" desc="Title case: The text label of a menu item to update IPNS.">
+          Update IPNS
         </message>
         <message name="IDS_NEW_OFFTHERECORD_WINDOW_TOR" desc="The text label of a menu item to open a new off-the-record window with Tor.">
           New private window with Tor
@@ -573,8 +591,14 @@ Or change later at <ph name="SETTINGS_EXTENIONS_LINK">$2<ex>brave://settings/ext
         <message name="IDS_CONTENT_CONTEXT_OPENLINKTOR_INAPP" desc="The name of the open a link in private window with Tor command">
           Open link in Brave private window with Tor
         </message>
-        <message name="IDS_APP_MENU_IPFS_IMPORT_LOCAL_FOLDER" desc="The text label of a menu item to share local folder using IPFS.">
-          Share local folder using IPFS
+        <message name="IDS_APP_MENU_IPFS_SHARE_LOCAL_FOLDER" desc="The text label of a menu item to share local folder using IPFS.">
+          Import and share a directory
+        </message>
+        <message name="IDS_APP_MENU_IPFS_PUBLISH_LOCAL_FILE" desc="Title case: The text label of a menu item to publish local file under IPFS key.">
+          With a File
+        </message>
+        <message name="IDS_APP_MENU_IPFS_PUBLISH_LOCAL_FOLDER" desc="Title case: The text label of a menu item to publish local fodler under IPFS key.">
+          With a Directory
         </message>
       </if>
       <message name="IDS_PROFILES_TOR_PROFILE_NAME" desc="Name of the Tor profile.">
@@ -1393,9 +1417,6 @@ Are you sure you want to do this?
         <message name="IDS_SIDEBAR_ADD_ITEM_BUBBLE_TITLE" desc="Title of sidebar add item bubble">
           Add to Sidebar
         </message>
-        <message name="IDS_SIDEBAR_TOOLTIP_ON_SHOW_OPTIONS_WIDGET" desc="Label of tooltip of sidebar show options widget area">
-          Show sidebar
-        </message>
         <message name="IDS_SIDEBAR_SHOW_OPTION_TITLE" desc="Title of sidebar show option menu">
           Show Sidebar
         </message>
@@ -1404,9 +1425,6 @@ Are you sure you want to do this?
         </message>
         <message name="IDS_SIDEBAR_SHOW_OPTION_MOUSEOVER" desc="Label for show sidebar on mousee over option">
           On mouseover
-        </message>
-        <message name="IDS_SIDEBAR_SHOW_OPTION_ONCLICK" desc="Label for show sidebar on click option">
-          On click
         </message>
         <message name="IDS_SIDEBAR_SHOW_OPTION_NEVER" desc="Label for show sidebar on click option">
           Never
@@ -1441,6 +1459,9 @@ Are you sure you want to do this?
         </message>
         <message name="IDS_SPEEDREADER_DISABLE_THIS_SITE" desc="Label to enable or disable speedreader per site">
           Turn on/off reader mode just for this website. To turn off Speedreader for your entire browser profile, visit
+        </message>
+        <message name="IDS_ACCNAME_SPEEDREADER_DISABLE_THIS_SITE_TOGGLE" desc="Accessible text for the toggle to enable or disable speedreader per site">
+          Toggle to turn on/off reader mode just for this website.
         </message>
         <message name="IDS_PAGE_IS_DISTILLED" desc="Speedreader is enabled on this page">
           in Speedreader

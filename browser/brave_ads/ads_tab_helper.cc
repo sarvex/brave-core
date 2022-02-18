@@ -8,7 +8,6 @@
 #include <memory>
 #include <utility>
 
-#include "base/hash/hash.h"
 #include "brave/browser/brave_ads/ads_service_factory.h"
 #include "chrome/browser/profiles/profile.h"
 #include "components/dom_distiller/content/browser/distiller_javascript_utils.h"
@@ -30,6 +29,7 @@ namespace brave_ads {
 
 AdsTabHelper::AdsTabHelper(content::WebContents* web_contents)
     : WebContentsObserver(web_contents),
+      content::WebContentsUserData<AdsTabHelper>(*web_contents),
       tab_id_(sessions::SessionTabHelper::IdForTab(web_contents)),
       weak_factory_(this) {
   if (!tab_id_.is_valid()) {
@@ -88,12 +88,6 @@ void AdsTabHelper::OnJavaScriptHtmlResult(base::Value value) {
   std::string html;
   value.GetAsString(&html);
 
-  const uint32_t html_hash = base::FastHash(html);
-  if (html_hash == html_hash_) {
-    return;
-  }
-  html_hash_ = html_hash;
-
   ads_service_->OnHtmlLoaded(tab_id_, redirect_chain_, html);
 }
 
@@ -107,12 +101,6 @@ void AdsTabHelper::OnJavaScriptTextResult(base::Value value) {
   }
   std::string text;
   value.GetAsString(&text);
-
-  const uint32_t text_hash = base::FastHash(text);
-  if (text_hash == text_hash_) {
-    return;
-  }
-  text_hash_ = text_hash;
 
   ads_service_->OnTextLoaded(tab_id_, redirect_chain_, text);
 }
@@ -147,13 +135,12 @@ void AdsTabHelper::DidFinishNavigation(
   RunIsolatedJavaScript(render_frame_host);
 }
 
-void AdsTabHelper::DocumentOnLoadCompletedInMainFrame(
-    content::RenderFrameHost* render_frame_host) {
+void AdsTabHelper::DocumentOnLoadCompletedInPrimaryMainFrame() {
   if (!should_process_) {
     return;
   }
 
-  RunIsolatedJavaScript(render_frame_host);
+  RunIsolatedJavaScript(web_contents()->GetMainFrame());
 }
 
 void AdsTabHelper::DidFinishLoad(content::RenderFrameHost* render_frame_host,

@@ -12,18 +12,7 @@ import {
 } from '../../constants/types'
 
 // Utils
-import {
-  formatBalance,
-  formatFiatBalance,
-  formatGasFeeFromFiat,
-  hexToNumber
-} from '../../utils/format-balances'
-import {
-  addNumericValues,
-  isNumericValueGreaterThan,
-  multiplyNumericValues,
-  normalizeNumericValue
-} from '../../utils/bn-utils'
+import Amount from '../../utils/amount'
 
 // Hooks
 import usePricing from './pricing'
@@ -40,6 +29,7 @@ interface ParsedTransactionFees {
   gasFee: string
   gasFeeFiat: string
   isEIP1559Transaction: boolean
+  missingGasLimitError?: string
 }
 
 interface ParsedTransaction extends ParsedTransactionFees {
@@ -52,9 +42,9 @@ interface ParsedTransaction extends ParsedTransactionFees {
   senderLabel: string
   recipient: string
   recipientLabel: string
-  fiatValue: string
-  fiatTotal: string
-  nativeCurrencyTotal: string
+  fiatValue: Amount
+  fiatTotal: Amount
+  formattedNativeCurrencyTotal: string
   value: string
   valueExact: string
   symbol: string
@@ -72,23 +62,51 @@ interface ParsedTransaction extends ParsedTransactionFees {
 }
 
 export function useTransactionFeesParser (selectedNetwork: BraveWallet.EthereumChain, networkSpotPrice: string) {
-  return React.useCallback((transactionInfo: BraveWallet.TransactionInfo): ParsedTransactionFees => {
-    const { txData } = transactionInfo
-    const { baseData: { gasLimit, gasPrice }, maxFeePerGas, maxPriorityFeePerGas } = txData
+  /**
+   * Checks if a given gasLimit is empty or zero-value, and returns an
+   * appropriate localized error string.
+   *
+   * @remarks
+   *
+   * This function may only be used on ALL transaction types.
+   *
+   * @param gasLimit - The parsed gasLimit string.
+   * @returns Localized string describing the error, or undefined in case of
+   * no error.
+   */
+  const checkForMissingGasLimitError = React.useCallback((gasLimit: string): string | undefined => {
+    return (gasLimit === '' || Amount.normalize(gasLimit) === '0')
+      ? getLocale('braveWalletMissingGasLimitError')
+      : undefined
+  }, [])
 
+  return React.useCallback((transactionInfo: BraveWallet.TransactionInfo): ParsedTransactionFees => {
+    const { txDataUnion: { ethTxData1559: txData } } = transactionInfo
+    const gasLimit = txData?.baseData.gasLimit || ''
+    const gasPrice = txData?.baseData.gasPrice || ''
+    const maxFeePerGas = txData?.maxFeePerGas || ''
+    const maxPriorityFeePerGas = txData?.maxPriorityFeePerGas || ''
     const isEIP1559Transaction = maxPriorityFeePerGas !== '' && maxFeePerGas !== ''
     const gasFee = isEIP1559Transaction
-      ? multiplyNumericValues(maxFeePerGas, gasLimit)
-      : multiplyNumericValues(gasPrice, gasLimit)
+      ? new Amount(maxFeePerGas)
+        .times(gasLimit)
+        .format()
+      : new Amount(gasPrice)
+        .times(gasLimit)
+        .format()
 
     return {
-      gasLimit: normalizeNumericValue(gasLimit),
-      gasPrice: normalizeNumericValue(gasPrice),
-      maxFeePerGas: normalizeNumericValue(maxFeePerGas),
-      maxPriorityFeePerGas: normalizeNumericValue(maxPriorityFeePerGas),
+      gasLimit: Amount.normalize(gasLimit),
+      gasPrice: Amount.normalize(gasPrice),
+      maxFeePerGas: Amount.normalize(maxFeePerGas),
+      maxPriorityFeePerGas: Amount.normalize(maxPriorityFeePerGas),
       gasFee,
-      gasFeeFiat: formatFiatBalance(gasFee, selectedNetwork.decimals, networkSpotPrice),
-      isEIP1559Transaction
+      gasFeeFiat: new Amount(gasFee)
+        .divideByDecimals(selectedNetwork.decimals)
+        .times(networkSpotPrice)
+        .formatAsFiat(),
+      isEIP1559Transaction,
+      missingGasLimitError: checkForMissingGasLimitError(gasLimit)
     }
   }, [selectedNetwork, networkSpotPrice])
 }
@@ -159,9 +177,10 @@ export function useTransactionParser (
   }
 
   return React.useCallback((transactionInfo: BraveWallet.TransactionInfo) => {
-    const { txArgs, txData, fromAddress, txType } = transactionInfo
-    const { baseData } = txData
-    const { value, to, nonce } = baseData
+    const { txArgs, txDataUnion: { ethTxData1559: txData }, fromAddress, txType } = transactionInfo
+    const value = txData?.baseData.value || ''
+    const to = txData?.baseData.to || ''
+    const nonce = txData?.baseData.nonce || ''
     const account = accounts.find((account) => account.address.toLowerCase() === fromAddress.toLowerCase())
     const token = findToken(to)
     const accountNativeBalance = getBalance(account)
@@ -172,14 +191,19 @@ export function useTransactionParser (
       case txType === BraveWallet.TransactionType.ERC20Transfer: {
         const [address, amount] = txArgs
         const price = findAssetPrice(token?.symbol ?? '')
-        const sendAmount = normalizeNumericValue(amount)
-        const sendAmountFiat = formatFiatBalance(amount, token?.decimals ?? 18, price)
+        const sendAmountFiat = new Amount(amount)
+          .divideByDecimals(token?.decimals ?? 18)
+          .times(price)
 
         const feeDetails = parseTransactionFees(transactionInfo)
         const { gasFeeFiat, gasFee } = feeDetails
-        const totalAmountFiat = (Number(gasFeeFiat) + Number(sendAmountFiat)).toFixed(2)
-        const insufficientNativeFunds = isNumericValueGreaterThan(gasFee, accountNativeBalance)
-        const insufficientTokenFunds = isNumericValueGreaterThan(sendAmount, accountTokenBalance)
+        const totalAmountFiat = new Amount(gasFeeFiat)
+          .plus(sendAmountFiat)
+
+        const insufficientNativeFunds = new Amount(gasFee)
+          .gt(accountNativeBalance)
+        const insufficientTokenFunds = new Amount(amount)
+          .gt(accountTokenBalance)
 
         return {
           hash: transactionInfo.txHash,
@@ -192,9 +216,15 @@ export function useTransactionParser (
           recipientLabel: getAddressLabel(address),
           fiatValue: sendAmountFiat,
           fiatTotal: totalAmountFiat,
-          nativeCurrencyTotal: sendAmountFiat && formatGasFeeFromFiat(sendAmountFiat, networkSpotPrice),
-          value: formatBalance(amount, token?.decimals ?? 18),
-          valueExact: formatBalance(amount, token?.decimals ?? 18, false),
+          formattedNativeCurrencyTotal: sendAmountFiat
+            .div(networkSpotPrice)
+            .formatAsAsset(6, selectedNetwork.symbol),
+          value: new Amount(amount)
+            .divideByDecimals(token?.decimals ?? 18)
+            .format(6),
+          valueExact: new Amount(amount)
+            .divideByDecimals(token?.decimals ?? 18)
+            .format(),
           symbol: token?.symbol ?? '',
           decimals: token?.decimals ?? 18,
           insufficientFundsError: insufficientNativeFunds || insufficientTokenFunds,
@@ -217,7 +247,8 @@ export function useTransactionParser (
         const { gasFeeFiat, gasFee } = feeDetails
         const totalAmountFiat = gasFeeFiat
 
-        const insufficientNativeFunds = isNumericValueGreaterThan(gasFee, accountNativeBalance)
+        const insufficientNativeFunds = new Amount(gasFee)
+          .gt(accountNativeBalance)
 
         return {
           hash: transactionInfo.txHash,
@@ -228,16 +259,18 @@ export function useTransactionParser (
           senderLabel: getAddressLabel(fromAddress),
           recipient: toAddress,
           recipientLabel: getAddressLabel(toAddress),
-          fiatValue: '0.00', // Display NFT values in the future
-          fiatTotal: totalAmountFiat,
-          nativeCurrencyTotal: totalAmountFiat && formatGasFeeFromFiat(totalAmountFiat, networkSpotPrice),
+          fiatValue: Amount.zero(), // Display NFT values in the future
+          fiatTotal: new Amount(totalAmountFiat),
+          formattedNativeCurrencyTotal: totalAmountFiat && new Amount(totalAmountFiat)
+            .div(networkSpotPrice)
+            .formatAsAsset(6, selectedNetwork.symbol),
           value: '1', // Can only send 1 erc721 at a time
           valueExact: '1',
           symbol: token?.symbol ?? '',
           decimals: 0,
           insufficientFundsError: insufficientNativeFunds,
           erc721BlockchainToken: token,
-          erc721TokenId: hexToNumber(tokenID ?? ''),
+          erc721TokenId: tokenID && `#${Amount.normalize(tokenID)}`,
           contractAddressError: checkForContractAddressError(toAddress),
           sameAddressError: checkForSameAddressError(toAddress, owner),
           ...feeDetails
@@ -249,15 +282,16 @@ export function useTransactionParser (
         const [address, amount] = txArgs
         const feeDetails = parseTransactionFees(transactionInfo)
         const { gasFeeFiat, gasFee } = feeDetails
-        const totalAmountFiat = Number(gasFeeFiat).toFixed(2)
-        const insufficientNativeFunds = isNumericValueGreaterThan(gasFee, accountNativeBalance)
-        const formattedAllowanceValue = isNumericValueGreaterThan(amount, accountTokenBalance)
+        const totalAmountFiat = new Amount(gasFeeFiat)
+        const insufficientNativeFunds = new Amount(gasFee)
+          .gt(accountNativeBalance)
+        const formattedAllowanceValue = new Amount(amount).gt(accountTokenBalance)
           ? getLocale('braveWalletTransactionApproveUnlimited')
-          : formatBalance(amount, token?.decimals ?? 18)
+          : new Amount(amount).divideByDecimals(token?.decimals ?? 18).format(6)
 
-        const formattedAllowanceValueExact = isNumericValueGreaterThan(amount, accountTokenBalance)
+        const formattedAllowanceValueExact = new Amount(amount).gt(accountTokenBalance)
           ? getLocale('braveWalletTransactionApproveUnlimited')
-          : formatBalance(amount, token?.decimals ?? 18, false)
+          : new Amount(amount).divideByDecimals(token?.decimals ?? 18).format()
 
         return {
           hash: transactionInfo.txHash,
@@ -268,9 +302,10 @@ export function useTransactionParser (
           senderLabel: getAddressLabel(fromAddress),
           recipient: to,
           recipientLabel: getAddressLabel(to),
-          fiatValue: (0).toFixed(2),
+          fiatValue: Amount.zero(),
           fiatTotal: totalAmountFiat,
-          nativeCurrencyTotal: (0).toFixed(2),
+          formattedNativeCurrencyTotal: Amount.zero()
+            .formatAsAsset(2, selectedNetwork.symbol),
           value: formattedAllowanceValue,
           valueExact: formattedAllowanceValueExact,
           symbol: token?.symbol ?? '',
@@ -292,7 +327,8 @@ export function useTransactionParser (
 
         const feeDetails = parseTransactionFees(transactionInfo)
         const { gasFeeFiat, gasFee } = feeDetails
-        const totalAmountFiat = (Number(gasFeeFiat) + Number(sendAmountFiat)).toFixed(2)
+        const totalAmountFiat = new Amount(gasFeeFiat)
+          .plus(sendAmountFiat)
 
         return {
           hash: transactionInfo.txHash,
@@ -305,12 +341,20 @@ export function useTransactionParser (
           recipientLabel: getAddressLabel(to),
           fiatValue: sendAmountFiat,
           fiatTotal: totalAmountFiat,
-          nativeCurrencyTotal: sendAmountFiat && formatGasFeeFromFiat(sendAmountFiat, networkSpotPrice),
-          value: formatBalance(value, selectedNetwork.decimals),
-          valueExact: formatBalance(value, selectedNetwork.decimals, false),
+          formattedNativeCurrencyTotal: sendAmountFiat
+            .div(networkSpotPrice)
+            .formatAsAsset(6, selectedNetwork.symbol),
+          value: new Amount(value)
+            .divideByDecimals(selectedNetwork.decimals)
+            .format(6),
+          valueExact: new Amount(value)
+            .divideByDecimals(selectedNetwork.decimals)
+            .format(),
           symbol: selectedNetwork.symbol,
           decimals: selectedNetwork?.decimals ?? 18,
-          insufficientFundsError: isNumericValueGreaterThan(addNumericValues(gasFee, value), accountNativeBalance),
+          insufficientFundsError: new Amount(value)
+            .plus(gasFee)
+            .gt(accountNativeBalance),
           isSwap: to.toLowerCase() === SwapExchangeProxy,
           ...feeDetails
         } as ParsedTransaction

@@ -16,12 +16,7 @@ import {
 import { reduceAddress } from '../../../utils/reduce-address'
 import { reduceNetworkDisplayName } from '../../../utils/network-utils'
 import { reduceAccountDisplayName } from '../../../utils/reduce-account-name'
-import { formatBalance, toWeiHex } from '../../../utils/format-balances'
-import {
-  formatWithCommasAndDecimals,
-  formatFiatAmountWithCommasAndDecimals,
-  formatTokenAmountWithCommasAndDecimals
-} from '../../../utils/format-prices'
+import Amount from '../../../utils/amount'
 
 // Hooks
 import { usePricing, useTransactionParser, useTokenInfo } from '../../../common/hooks'
@@ -130,7 +125,7 @@ function ConfirmTransactionPanel (props: Props) {
     updateUnapprovedTransactionNonce
   } = props
 
-  const { txData: { gasEstimation: transactionGasEstimates } } = transactionInfo
+  const transactionGasEstimates = transactionInfo.txDataUnion.ethTxData1559?.gasEstimation
 
   const [maxPriorityPanel, setMaxPriorityPanel] = React.useState<MaxPriorityPanels>(MaxPriorityPanels.setSuggested)
   const [suggestedSliderStep, setSuggestedSliderStep] = React.useState<string>('1')
@@ -191,7 +186,9 @@ function ConfirmTransactionPanel (props: Props) {
       transactionDetails.sender,
       transactionDetails.approvalTarget
     ).then(result => {
-      const allowance = formatBalance(result, transactionDetails.decimals)
+      const allowance = new Amount(result)
+        .divideByDecimals(transactionDetails.decimals)
+        .format()
       setCurrentTokenAllowance(allowance)
     }).catch(e => console.error(e))
   }, [])
@@ -230,7 +227,9 @@ function ConfirmTransactionPanel (props: Props) {
     updateUnapprovedTransactionSpendAllowance({
       txMetaId: transactionInfo.id,
       spenderAddress: transactionDetails.approvalTarget || '',
-      allowance: toWeiHex(allowance, transactionDetails.decimals)
+      allowance: new Amount(allowance)
+        .multiplyByDecimals(transactionDetails.decimals)
+        .toHex()
     })
   }
 
@@ -253,7 +252,8 @@ function ConfirmTransactionPanel (props: Props) {
     return (
       !!transactionDetails.sameAddressError ||
       !!transactionDetails.contractAddressError ||
-      transactionDetails.insufficientFundsError
+      transactionDetails.insufficientFundsError ||
+      !!transactionDetails.missingGasLimitError
     )
   }, [transactionDetails])
 
@@ -350,12 +350,17 @@ function ConfirmTransactionPanel (props: Props) {
             {transactionInfo.txType === BraveWallet.TransactionType.ERC721TransferFrom ||
               transactionInfo.txType === BraveWallet.TransactionType.ERC721SafeTransferFrom
               ? transactionDetails.erc721BlockchainToken?.name + ' ' + transactionDetails.erc721TokenId
-              : formatTokenAmountWithCommasAndDecimals(transactionDetails.valueExact, transactionDetails.symbol)
+              : new Amount(transactionDetails.valueExact)
+                .formatAsAsset(undefined, transactionDetails.symbol)
             }
           </TransactionAmountBig>
           {transactionInfo.txType !== BraveWallet.TransactionType.ERC721TransferFrom &&
             transactionInfo.txType !== BraveWallet.TransactionType.ERC721SafeTransferFrom &&
-            <TransactionFiatAmountBig>{formatFiatAmountWithCommasAndDecimals(transactionDetails.fiatValue, defaultCurrencies.fiat)}</TransactionFiatAmountBig>
+            <TransactionFiatAmountBig>
+              {
+                transactionDetails.fiatValue.formatAsFiat(defaultCurrencies.fiat)
+              }
+            </TransactionFiatAmountBig>
           }
         </>
       )}
@@ -384,13 +389,20 @@ function ConfirmTransactionPanel (props: Props) {
                   <EditButton onClick={onToggleEditGas}>{getLocale('braveWalletAllowSpendEditButton')}</EditButton>
                   <SectionRow>
                     <TransactionTitle>{getLocale('braveWalletAllowSpendTransactionFee')}</TransactionTitle>
-                    <TransactionTypeText>{formatWithCommasAndDecimals(formatBalance(transactionDetails.gasFee, selectedNetwork.decimals))} {selectedNetwork.symbol}</TransactionTypeText>
+                    <TransactionTypeText>
+                      {
+                        new Amount(transactionDetails.gasFee)
+                          .divideByDecimals(selectedNetwork.decimals)
+                          .formatAsAsset(6, selectedNetwork.symbol)
+                      }
+                    </TransactionTypeText>
                   </SectionRow>
                   <TransactionText
                     hasError={transactionDetails.insufficientFundsError}
                   >
                     {transactionDetails.insufficientFundsError ? `${getLocale('braveWalletSwapInsufficientBalance')} ` : ''}
-                    {formatFiatAmountWithCommasAndDecimals(transactionDetails.gasFeeFiat, defaultCurrencies.fiat)}
+                    {new Amount(transactionDetails.gasFeeFiat)
+                      .formatAsFiat(defaultCurrencies.fiat)}
                   </TransactionText>
                 </TopColumn>
                 <Divider />
@@ -405,7 +417,14 @@ function ConfirmTransactionPanel (props: Props) {
                 <SectionRow>
                   <TransactionTitle>{getLocale('braveWalletAllowSpendProposedAllowance')}</TransactionTitle>
                   <SectionRightColumn>
-                    <TransactionTypeText>{formatTokenAmountWithCommasAndDecimals(transactionDetails.valueExact, transactionDetails.symbol)}</TransactionTypeText>
+                    <TransactionTypeText>
+                      {
+                        new Amount(transactionDetails.valueExact).isNaN()
+                          ? transactionDetails.valueExact
+                          : new Amount(transactionDetails.valueExact)
+                              .formatAsAsset(undefined, transactionDetails.symbol)
+                      }
+                    </TransactionTypeText>
                     <TransactionText />
                   </SectionRightColumn>
                 </SectionRow>
@@ -417,8 +436,19 @@ function ConfirmTransactionPanel (props: Props) {
                   <TransactionTitle>{getLocale('braveWalletConfirmTransactionGasFee')}</TransactionTitle>
                   <SectionRightColumn>
                     <EditButton onClick={onToggleEditGas}>{getLocale('braveWalletAllowSpendEditButton')}</EditButton>
-                    <TransactionTypeText>{formatWithCommasAndDecimals(formatBalance(transactionDetails.gasFee, selectedNetwork.decimals))} {selectedNetwork.symbol}</TransactionTypeText>
-                    <TransactionText>{formatFiatAmountWithCommasAndDecimals(transactionDetails.gasFeeFiat, defaultCurrencies.fiat)}</TransactionText>
+                    <TransactionTypeText>
+                      {
+                        new Amount(transactionDetails.gasFee)
+                          .divideByDecimals(selectedNetwork.decimals)
+                          .formatAsAsset(6, selectedNetwork.symbol)
+                      }
+                    </TransactionTypeText>
+                    <TransactionText>
+                      {
+                        new Amount(transactionDetails.gasFeeFiat)
+                          .formatAsFiat(defaultCurrencies.fiat)
+                      }
+                    </TransactionText>
                   </SectionRightColumn>
                 </SectionRow>
                 <Divider />
@@ -429,9 +459,11 @@ function ConfirmTransactionPanel (props: Props) {
                     <GrandTotalText>
                       {(transactionInfo.txType !== BraveWallet.TransactionType.ERC721SafeTransferFrom &&
                         transactionInfo.txType !== BraveWallet.TransactionType.ERC721TransferFrom)
-                        ? formatWithCommasAndDecimals(transactionDetails.valueExact)
+                        ? new Amount(transactionDetails.valueExact)
+                          .format(undefined, true)
                         : transactionDetails.valueExact
-                      } {transactionDetails.symbol} + {formatBalance(transactionDetails.gasFee, selectedNetwork.decimals)} {selectedNetwork.symbol}</GrandTotalText>
+                      } {transactionDetails.symbol} + {new Amount(transactionDetails.gasFee).divideByDecimals(selectedNetwork.decimals).formatAsAsset(6, selectedNetwork.symbol)}
+                    </GrandTotalText>
                   </SingleRow>
                   <TransactionText
                     hasError={transactionDetails.insufficientFundsError}
@@ -439,7 +471,8 @@ function ConfirmTransactionPanel (props: Props) {
                     {transactionDetails.insufficientFundsError
                       ? `${getLocale('braveWalletSwapInsufficientBalance')} `
                       : ''}
-                    {formatFiatAmountWithCommasAndDecimals(transactionDetails.fiatTotal, defaultCurrencies.fiat)}
+                    {transactionDetails.fiatTotal
+                      .formatAsFiat(defaultCurrencies.fiat)}
                   </TransactionText>
 
                 </SectionColumn>
@@ -465,6 +498,12 @@ function ConfirmTransactionPanel (props: Props) {
       {transactionDetails.sameAddressError &&
         <ErrorText>
           {transactionDetails.sameAddressError}
+        </ErrorText>
+      }
+
+      {transactionDetails.missingGasLimitError &&
+        <ErrorText>
+          {transactionDetails.missingGasLimitError}
         </ErrorText>
       }
 

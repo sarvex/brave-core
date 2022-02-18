@@ -68,6 +68,7 @@ source_set("ui") {
       "brave_browser_command_controller.h",
       "brave_browser_content_setting_bubble_model_delegate.cc",
       "brave_browser_content_setting_bubble_model_delegate.h",
+      "brave_browser_window.cc",
       "brave_browser_window.h",
       "brave_layout_constants.cc",
       "brave_layout_constants.h",
@@ -95,8 +96,8 @@ source_set("ui") {
       "toolbar/brave_recent_tabs_sub_menu_model.h",
       "webui/brave_settings_ui.cc",
       "webui/brave_settings_ui.h",
-      "webui/brave_shields/shields_data_handler.cc",
-      "webui/brave_shields/shields_data_handler.h",
+      "webui/brave_shields/shields_panel_data_handler.cc",
+      "webui/brave_shields/shields_panel_data_handler.h",
       "webui/brave_shields/shields_panel_handler.cc",
       "webui/brave_shields/shields_panel_handler.h",
       "webui/brave_shields/shields_panel_ui.cc",
@@ -334,6 +335,7 @@ source_set("ui") {
     deps += [
       "//brave/components/ipfs",
       "//brave/components/ipfs_ui:generated_resources",
+      "//components/component_updater",
     ]
   }
 
@@ -357,8 +359,16 @@ source_set("ui") {
 
   if (enable_sidebar) {
     deps += [
+      "//brave/browser/resources/sidebar:resources",
       "//brave/browser/ui/sidebar",
+      "//brave/browser/ui/webui/sidebar:mojo_bindings",
       "//brave/components/sidebar",
+      "//chrome/app:generated_resources",
+      "//components/bookmarks/browser",
+      "//components/favicon_base",
+      "//mojo/public/cpp/bindings",
+      "//ui/base/mojom",
+      "//ui/webui",
     ]
 
     sources += [
@@ -390,6 +400,10 @@ source_set("ui") {
       "views/sidebar/sidebar_items_scroll_view.h",
       "views/sidebar/sidebar_show_options_event_detect_widget.cc",
       "views/sidebar/sidebar_show_options_event_detect_widget.h",
+      "webui/sidebar/sidebar_bookmarks_page_handler.cc",
+      "webui/sidebar/sidebar_bookmarks_page_handler.h",
+      "webui/sidebar/sidebar_bookmarks_ui.cc",
+      "webui/sidebar/sidebar_bookmarks_ui.h",
     ]
   }
 

@@ -13,6 +13,7 @@
 #include "bat/ads/ad_notification_info.h"
 #include "bat/ads/ad_type.h"
 #include "bat/ads/internal/ad_delivery/ad_notifications/ad_notification_delivery.h"
+#include "bat/ads/internal/ad_serving/ad_serving_features.h"
 #include "bat/ads/internal/ad_serving/ad_targeting/geographic/subdivision/subdivision_targeting.h"
 #include "bat/ads/internal/ad_targeting/ad_targeting.h"
 #include "bat/ads/internal/ad_targeting/ad_targeting_user_model_builder.h"
@@ -24,11 +25,10 @@
 #include "bat/ads/internal/client/client.h"
 #include "bat/ads/internal/eligible_ads/ad_notifications/eligible_ad_notifications_base.h"
 #include "bat/ads/internal/eligible_ads/ad_notifications/eligible_ad_notifications_factory.h"
-#include "bat/ads/internal/features/ad_serving/ad_serving_features.h"
 #include "bat/ads/internal/logging.h"
 #include "bat/ads/internal/p2a/p2a_ad_opportunities/p2a_ad_opportunity.h"
 #include "bat/ads/internal/platform/platform_helper.h"
-#include "bat/ads/internal/resources/frequency_capping/anti_targeting_resource.h"
+#include "bat/ads/internal/resources/frequency_capping/anti_targeting/anti_targeting_resource.h"
 #include "bat/ads/internal/segments/segments_aliases.h"
 #include "bat/ads/internal/settings/settings.h"
 #include "bat/ads/internal/time_formatting_util.h"
@@ -119,14 +119,15 @@ void AdServing::MaybeServeAd() {
     return;
   }
 
-  const ad_targeting::UserModelInfo user_model = ad_targeting::BuildUserModel();
+  const ad_targeting::UserModelInfo& user_model =
+      ad_targeting::BuildUserModel();
 
   DCHECK(eligible_ads_);
   eligible_ads_->GetForUserModel(
       user_model, [=](const bool had_opportunity,
                       const CreativeAdNotificationList& creative_ads) {
         if (had_opportunity) {
-          const SegmentList segments =
+          const SegmentList& segments =
               ad_targeting::GetTopParentChildSegments(user_model);
           p2a::RecordAdOpportunityForSegments(AdType::kAdNotification,
                                               segments);
@@ -141,9 +142,9 @@ void AdServing::MaybeServeAd() {
         BLOG(1, "Found " << creative_ads.size() << " eligible ads");
 
         const int rand = base::RandInt(0, creative_ads.size() - 1);
-        const CreativeAdNotificationInfo creative_ad = creative_ads.at(rand);
+        const CreativeAdNotificationInfo& creative_ad = creative_ads.at(rand);
 
-        const AdNotificationInfo ad = BuildAdNotification(creative_ad);
+        const AdNotificationInfo& ad = BuildAdNotification(creative_ad);
         if (!ServeAd(ad)) {
           BLOG(1, "Failed to serve ad notification");
           FailedToServeAd();

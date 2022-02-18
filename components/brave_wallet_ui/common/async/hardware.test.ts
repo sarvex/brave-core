@@ -2,7 +2,9 @@
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
-
+import { TextEncoder, TextDecoder } from 'util'
+global.TextDecoder = TextDecoder
+global.TextEncoder = TextEncoder
 import { EthereumSignedTx } from 'trezor-connect/lib/typescript'
 import {
   BraveWallet,
@@ -92,14 +94,16 @@ const getMockedProxyServices = (
         return '0x123'
       }
     },
-    ethTxService: {
+    txService: {
+      getTransactionMessageToSign: (coinType: BraveWallet.CoinType, id: string): GetTransactionMessageToSignReturnInfo | undefined => {
+        expect(id).toStrictEqual(expectedId)
+        return messageToSign
+      }
+    },
+    ethTxManagerProxy: {
       getNonceForHardwareTransaction: (id: string): GetNonceForHardwareTransactionReturnInfo | undefined => {
         expect(id).toStrictEqual(expectedId)
         return nonce
-      },
-      getTransactionMessageToSign: (id: string): GetTransactionMessageToSignReturnInfo | undefined => {
-        expect(id).toStrictEqual(expectedId)
-        return messageToSign
       },
       processHardwareSignature: (id: string, v: string, r: string, s: string): ProcessHardwareSignatureReturnInfo | undefined => {
         expect(id).toStrictEqual(expectedId)

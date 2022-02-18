@@ -32,7 +32,7 @@ import { NewUnapprovedTxAdded } from '../../common/constants/action_types'
 import { fetchSwapQuoteFactory } from '../../common/async/handlers'
 import { Store } from '../../common/async/types'
 import { GetTokenParam } from '../../utils/api-utils'
-import { extractPublicKeyForBLS, encodeKeyToHex } from '../../common/hardware/ledgerjs/filecoin_ledger_keyring'
+import { encodeKeyToHex } from '../../common/hardware/ledgerjs/filecoin_ledger_keyring'
 
 const handler = new AsyncActionHandler()
 
@@ -66,7 +66,7 @@ handler.on(WalletPageActions.restoreWallet.getType(), async (store: Store, paylo
 
 handler.on(WalletPageActions.addAccount.getType(), async (store: Store, payload: AddAccountPayloadType) => {
   const keyringService = getWalletPageApiProxy().keyringService
-  const result = await keyringService.addAccount(payload.accountName)
+  const result = await keyringService.addAccount(payload.accountName, payload.coin)
   return result.success
 })
 
@@ -101,7 +101,7 @@ handler.on(WalletPageActions.selectAsset.getType(), async (store: Store, payload
 
 handler.on(WalletPageActions.importAccount.getType(), async (store: Store, payload: ImportAccountPayloadType) => {
   const keyringService = getWalletPageApiProxy().keyringService
-  const result = await keyringService.importAccount(payload.accountName, payload.privateKey)
+  const result = await keyringService.importAccount(payload.accountName, payload.privateKey, payload.coin)
   if (result.success) {
     store.dispatch(WalletPageActions.setImportAccountError(false))
     store.dispatch(WalletPageActions.setShowAddModal(false))
@@ -114,7 +114,7 @@ handler.on(WalletPageActions.importFilecoinAccount.getType(), async (store: Stor
   const { keyringService } = getWalletPageApiProxy()
   const result = (payload.protocol === BraveWallet.FilecoinAddressProtocol.SECP256K1)
     ? await keyringService.importFilecoinSECP256K1Account(payload.accountName, encodeKeyToHex(payload.privateKey), payload.network)
-    : await keyringService.importFilecoinBLSAccount(payload.accountName, payload.privateKey, extractPublicKeyForBLS(payload.privateKey), payload.network)
+    : await keyringService.importFilecoinBLSAccount(payload.accountName, payload.privateKey, payload.network)
 
   if (result.success) {
     store.dispatch(WalletPageActions.setImportAccountError(false))
@@ -137,15 +137,15 @@ handler.on(WalletPageActions.importAccountFromJson.getType(), async (store: Stor
 
 handler.on(WalletPageActions.removeImportedAccount.getType(), async (store: Store, payload: RemoveImportedAccountPayloadType) => {
   const keyringService = getWalletPageApiProxy().keyringService
-  const result = await keyringService.removeImportedAccount(payload.address)
+  const result = await keyringService.removeImportedAccount(payload.address, payload.coin)
   return result.success
 })
 
 handler.on(WalletPageActions.viewPrivateKey.getType(), async (store: Store, payload: ViewPrivateKeyPayloadType) => {
   const keyringService = getWalletPageApiProxy().keyringService
   const result = payload.isDefault
-    ? await keyringService.getPrivateKeyForDefaultKeyringAccount(payload.address)
-    : await keyringService.getPrivateKeyForImportedAccount(payload.address)
+    ? await keyringService.getPrivateKeyForKeyringAccount(payload.address, payload.coin)
+    : await keyringService.getPrivateKeyForImportedAccount(payload.address, payload.coin)
   store.dispatch(WalletPageActions.privateKeyAvailable({ privateKey: result.privateKey }))
 })
 
@@ -183,8 +183,8 @@ handler.on(WalletPageActions.checkWalletsToImport.getType(), async (store) => {
   const mmResult =
     await braveWalletService.isExternalWalletInitialized(
       BraveWallet.ExternalWalletType.MetaMask)
-  store.dispatch(WalletPageActions.setCryptoWalletsInstalled(cwResult.initialized))
-  store.dispatch(WalletActions.setMetaMaskInstalled(mmResult.initialized))
+  store.dispatch(WalletPageActions.setCryptoWalletsInitialized(cwResult.initialized))
+  store.dispatch(WalletPageActions.setMetaMaskInitialized(mmResult.initialized))
 })
 
 handler.on(WalletPageActions.importFromCryptoWallets.getType(), async (store: Store, payload: ImportFromExternalWalletPayloadType) => {

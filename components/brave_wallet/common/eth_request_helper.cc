@@ -23,7 +23,8 @@ namespace {
 absl::optional<base::Value::ListStorage> GetParamsList(
     const std::string& json) {
   auto json_value =
-      base::JSONReader::Read(json, base::JSON_ALLOW_TRAILING_COMMAS);
+      base::JSONReader::Read(json, base::JSON_PARSE_CHROMIUM_EXTENSIONS |
+                                       base::JSON_ALLOW_TRAILING_COMMAS);
   if (!json_value || !json_value->is_dict())
     return absl::nullopt;
 
@@ -44,7 +45,8 @@ absl::optional<base::Value> GetObjectFromParamsList(const std::string& json) {
 
 absl::optional<base::Value> GetParamsDict(const std::string& json) {
   auto json_value =
-      base::JSONReader::Read(json, base::JSON_ALLOW_TRAILING_COMMAS);
+      base::JSONReader::Read(json, base::JSON_PARSE_CHROMIUM_EXTENSIONS |
+                                       base::JSON_ALLOW_TRAILING_COMMAS);
   if (!json_value || !json_value->is_dict()) {
     return absl::nullopt;
   }
@@ -188,7 +190,8 @@ bool GetEthJsonRequestInfo(const std::string& json,
                            std::string* params) {
   base::JSONReader::ValueWithError value_with_error =
       base::JSONReader::ReadAndReturnValueWithError(
-          json, base::JSONParserOptions::JSON_PARSE_RFC);
+          json, base::JSON_PARSE_CHROMIUM_EXTENSIONS |
+                    base::JSONParserOptions::JSON_PARSE_RFC);
   absl::optional<base::Value>& records_v = value_with_error.value;
   if (!records_v) {
     return false;
@@ -229,7 +232,8 @@ bool NormalizeEthRequest(const std::string& input_json,
   CHECK(output_json);
   base::JSONReader::ValueWithError value_with_error =
       base::JSONReader::ReadAndReturnValueWithError(
-          input_json, base::JSONParserOptions::JSON_PARSE_RFC);
+          input_json, base::JSON_PARSE_CHROMIUM_EXTENSIONS |
+                          base::JSONParserOptions::JSON_PARSE_RFC);
   absl::optional<base::Value>& records_v = value_with_error.value;
   if (!records_v)
     return false;
@@ -288,6 +292,16 @@ bool ParsePersonalSignParams(const std::string& json,
   if (!address_str || !message_str)
     return false;
 
+  // MetaMask accepts input in the wrong order, so we try for the right order
+  // but if it's invalid then we allow it to be swapped if the other combination
+  // is valid
+  if (!EthAddress::IsValidAddress(*address_str) &&
+      EthAddress::IsValidAddress(*message_str)) {
+    const std::string* temp = address_str;
+    address_str = message_str;
+    message_str = temp;
+  }
+
   *address = *address_str;
   // MM encodes 0x as a string and not an empty value
   if (IsValidHexString(*message_str) && *message_str != "0x") {
@@ -333,10 +347,12 @@ bool ParsePersonalEcRecoverParams(const std::string& json,
 bool ParseEthSignTypedDataParams(const std::string& json,
                                  std::string* address,
                                  std::string* message_out,
-                                 std::vector<uint8_t>* message_to_sign_out,
                                  base::Value* domain_out,
-                                 EthSignTypedDataHelper::Version version) {
-  if (!address || !message_out || !domain_out || !message_to_sign_out)
+                                 EthSignTypedDataHelper::Version version,
+                                 std::vector<uint8_t>* domain_hash_out,
+                                 std::vector<uint8_t>* primary_hash_out) {
+  if (!address || !message_out || !domain_out || !domain_hash_out ||
+      !primary_hash_out)
     return false;
 
   auto list = GetParamsList(json);
@@ -348,8 +364,9 @@ bool ParseEthSignTypedDataParams(const std::string& json,
   if (!address_str || !typed_data_str)
     return false;
 
-  auto typed_data =
-      base::JSONReader::Read(*typed_data_str, base::JSON_ALLOW_TRAILING_COMMAS);
+  auto typed_data = base::JSONReader::Read(
+      *typed_data_str,
+      base::JSON_PARSE_CHROMIUM_EXTENSIONS | base::JSON_ALLOW_TRAILING_COMMAS);
   if (!typed_data || !typed_data->is_dict())
     return false;
 
@@ -376,12 +393,14 @@ bool ParseEthSignTypedDataParams(const std::string& json,
       EthSignTypedDataHelper::Create(*types, version);
   if (!helper)
     return false;
-
-  auto message_to_sign =
-      helper->GetTypedDataMessageToSign(*primary_type, *message, *domain);
-  if (!message_to_sign)
+  auto domain_hash = helper->GetTypedDataDomainHash(*domain);
+  if (!domain_hash)
     return false;
-  *message_to_sign_out = *message_to_sign;
+  auto primary_hash = helper->GetTypedDataPrimaryHash(*primary_type, *message);
+  if (!primary_hash)
+    return false;
+  *domain_hash_out = *domain_hash;
+  *primary_hash_out = *primary_hash;
 
   *domain_out = domain->Clone();
 

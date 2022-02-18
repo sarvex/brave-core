@@ -53,21 +53,23 @@ export interface Props {
   privateKey: string
   transactionSpotPrices: BraveWallet.AssetPrice[]
   hasImportError: boolean
+  isFilecoinEnabled: boolean
+  isSolanaEnabled: boolean
   onUpdateVisibleAssets: (updatedTokensList: BraveWallet.BlockchainToken[]) => void
   onAddCustomAsset: (token: BraveWallet.BlockchainToken) => void
   onLockWallet: () => void
   onSetImportError: (hasError: boolean) => void
   onImportAccountFromJson: (accountName: string, password: string, json: string) => void
   onDoneViewingPrivateKey: () => void
-  onViewPrivateKey: (address: string, isDefault: boolean) => void
-  onRemoveAccount: (address: string, hardware: boolean) => void
+  onViewPrivateKey: (address: string, isDefault: boolean, coin: BraveWallet.CoinType) => void
+  onRemoveAccount: (address: string, hardware: boolean, coin: BraveWallet.CoinType) => void
   onSelectNetwork: (network: BraveWallet.EthereumChain) => void
   onToggleAddModal: () => void
   onUpdateAccountName: (payload: UpdateAccountNamePayloadType) => { success: boolean }
   getBalance: (address: string) => Promise<string>
   onAddHardwareAccounts: (selected: BraveWallet.HardwareWalletAccount[]) => void
   onConnectHardwareWallet: (opts: HardwareWalletConnectOpts) => Promise<BraveWallet.HardwareWalletAccount[]>
-  onImportAccount: (accountName: string, privateKey: string) => void
+  onImportAccount: (accountName: string, privateKey: string, coin: BraveWallet.CoinType) => void
   onImportFilecoinAccount: (accountName: string, privateKey: string, network: string, protocol: BraveWallet.FilecoinAddressProtocol) => void
   onCreateAccount: (name: string) => void
   onSelectAsset: (asset: BraveWallet.BlockchainToken | undefined) => void
@@ -105,6 +107,8 @@ const CryptoStoryView = (props: Props) => {
     showAddModal,
     isFetchingPortfolioPriceHistory,
     showVisibleAssetsModal,
+    isFilecoinEnabled,
+    isSolanaEnabled,
     onShowVisibleAssetsModal,
     onLockWallet,
     onShowBackup,
@@ -351,6 +355,8 @@ const CryptoStoryView = (props: Props) => {
           onCreateAccount={onCreateAccount}
           onImportAccount={onImportAccount}
           onImportFilecoinAccount={onImportFilecoinAccount}
+          isFilecoinEnabled={isFilecoinEnabled}
+          isSolanaEnabled={isSolanaEnabled}
           onConnectHardwareWallet={onConnectHardwareWallet}
           onAddHardwareAccounts={onAddHardwareAccounts}
           getBalance={getBalance}

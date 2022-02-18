@@ -5,9 +5,8 @@
 
 #include "brave/components/brave_shields/browser/domain_block_controller_client.h"
 
-#include "brave/components/brave_shields/browser/ad_block_custom_filters_service.h"
+#include "brave/components/brave_shields/browser/ad_block_custom_filters_provider.h"
 #include "brave/components/brave_shields/browser/domain_block_tab_storage.h"
-#include "brave/components/ephemeral_storage/ephemeral_storage_service.h"
 #include "components/prefs/pref_service.h"
 #include "components/security_interstitials/content/settings_page_helper.h"
 #include "components/security_interstitials/core/metrics_helper.h"
@@ -32,7 +31,7 @@ DomainBlockControllerClient::GetMetricsHelper(const GURL& url) {
 DomainBlockControllerClient::DomainBlockControllerClient(
     content::WebContents* web_contents,
     const GURL& request_url,
-    AdBlockCustomFiltersService* ad_block_custom_filters_service,
+    AdBlockCustomFiltersProvider* ad_block_custom_filters_provider,
     ephemeral_storage::EphemeralStorageService* ephemeral_storage_service,
     PrefService* prefs,
     const std::string& locale)
@@ -44,7 +43,7 @@ DomainBlockControllerClient::DomainBlockControllerClient(
           GURL("about:blank") /* default_safe_page */,
           nullptr /* settings_page_helper */),
       request_url_(request_url),
-      ad_block_custom_filters_service_(ad_block_custom_filters_service),
+      ad_block_custom_filters_provider_(ad_block_custom_filters_provider),
       ephemeral_storage_service_(ephemeral_storage_service),
       dont_warn_again_(false) {}
 
@@ -60,15 +59,16 @@ void DomainBlockControllerClient::Proceed() {
   tab_storage->SetIsProceeding(true);
   if (dont_warn_again_) {
     std::string custom_filters =
-        ad_block_custom_filters_service_->GetCustomFilters();
-    ad_block_custom_filters_service_->UpdateCustomFilters(
+        ad_block_custom_filters_provider_->GetCustomFilters();
+    ad_block_custom_filters_provider_->UpdateCustomFilters(
         "@@||" + request_url_.host() + "^\n" + custom_filters);
   }
 
   if (!dont_warn_again_ && ephemeral_storage_service_) {
-    ephemeral_storage_service_->Enable1PESForUrlIfPossible(
-        request_url_, base::BindOnce(&DomainBlockControllerClient::ReloadPage,
-                                     weak_ptr_factory_.GetWeakPtr()));
+    tab_storage->Enable1PESForUrlIfPossible(
+        ephemeral_storage_service_, request_url_,
+        base::BindOnce(&DomainBlockControllerClient::ReloadPage,
+                       weak_ptr_factory_.GetWeakPtr()));
   } else {
     ReloadPage();
   }

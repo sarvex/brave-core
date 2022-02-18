@@ -6,17 +6,17 @@
 #include "brave/browser/browser_context_keyed_service_factories.h"
 
 #include "brave/browser/brave_ads/ads_service_factory.h"
-#include "brave/browser/brave_federated_learning/brave_federated_learning_service_factory.h"
+#include "brave/browser/brave_federated/brave_federated_service_factory.h"
 #include "brave/browser/brave_news/brave_news_controller_factory.h"
 #include "brave/browser/brave_rewards/rewards_service_factory.h"
 #include "brave/browser/brave_shields/ad_block_pref_service_factory.h"
 #include "brave/browser/brave_shields/cookie_pref_service_factory.h"
 #include "brave/browser/brave_wallet/asset_ratio_service_factory.h"
 #include "brave/browser/brave_wallet/brave_wallet_service_factory.h"
-#include "brave/browser/brave_wallet/eth_tx_service_factory.h"
 #include "brave/browser/brave_wallet/json_rpc_service_factory.h"
 #include "brave/browser/brave_wallet/keyring_service_factory.h"
 #include "brave/browser/brave_wallet/swap_service_factory.h"
+#include "brave/browser/brave_wallet/tx_service_factory.h"
 #include "brave/browser/debounce/debounce_service_factory.h"
 #include "brave/browser/ethereum_remote_client/buildflags/buildflags.h"
 #include "brave/browser/ntp_background_images/view_counter_service_factory.h"
@@ -60,7 +60,7 @@ namespace brave {
 
 void EnsureBrowserContextKeyedServiceFactoriesBuilt() {
   brave_ads::AdsServiceFactory::GetInstance();
-  brave::BraveFederatedLearningServiceFactory::GetInstance();
+  brave_federated::BraveFederatedServiceFactory::GetInstance();
   brave_rewards::RewardsServiceFactory::GetInstance();
   brave_shields::AdBlockPrefServiceFactory::GetInstance();
   brave_shields::CookiePrefServiceFactory::GetInstance();
@@ -89,7 +89,7 @@ void EnsureBrowserContextKeyedServiceFactoriesBuilt() {
   brave_wallet::KeyringServiceFactory::GetInstance();
   brave_wallet::JsonRpcServiceFactory::GetInstance();
   brave_wallet::SwapServiceFactory::GetInstance();
-  brave_wallet::EthTxServiceFactory::GetInstance();
+  brave_wallet::TxServiceFactory::GetInstance();
   brave_wallet::BraveWalletServiceFactory::GetInstance();
 
 #if BUILDFLAG(ETHEREUM_REMOTE_CLIENT_ENABLED)

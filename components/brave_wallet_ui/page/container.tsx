@@ -35,10 +35,9 @@ import Onboarding from '../stories/screens/onboarding'
 import BackupWallet from '../stories/screens/backup-wallet'
 
 // Utils
-import { formatWithCommasAndDecimals } from '../utils/format-prices'
+import Amount from '../utils/amount'
 import { GetBuyOrFaucetUrl } from '../utils/buy-asset-url'
 import { mojoTimeDeltaToJSDate } from '../utils/datetime-utils'
-import { addNumericValues } from '../utils/bn-utils'
 
 import {
   findENSAddress,
@@ -77,6 +76,8 @@ function Container (props: Props) {
   const { pathname: walletLocation } = useLocation()
   // Wallet Props
   const {
+    isFilecoinEnabled,
+    isSolanaEnabled,
     isWalletCreated,
     isWalletLocked,
     isWalletBackedUp,
@@ -114,7 +115,8 @@ function Container (props: Props) {
     importAccountError,
     importWalletError,
     showAddModal,
-    isCryptoWalletsInstalled,
+    isCryptoWalletsInitialized,
+    isMetaMaskInitialized,
     swapQuote,
     swapError
   } = props.page
@@ -124,6 +126,7 @@ function Container (props: Props) {
   const [buyAmount, setBuyAmount] = React.useState('')
   const [selectedWidgetTab, setSelectedWidgetTab] = React.useState<BuySendSwapTypes>('buy')
   const [showVisibleAssetsModal, setShowVisibleAssetsModal] = React.useState<boolean>(false)
+  const [sessionRoute, setSessionRoute] = React.useState<string | undefined>(undefined)
 
   const {
     swapAssetOptions,
@@ -224,7 +227,14 @@ function Container (props: Props) {
   const fromAssetBalance = getAccountBalance(selectedAccount, fromAsset)
   const toAssetBalance = getAccountBalance(selectedAccount, toAsset)
 
-  const onSelectPresetAmountFactory = usePreset(selectedAccount, selectedNetwork, fromAsset, selectedSendAsset, onSetFromAmount, onSetSendAmount)
+  const onSelectPresetAmountFactory = usePreset(
+    selectedAccount,
+    selectedNetwork,
+    onSetFromAmount,
+    onSetSendAmount,
+    fromAsset,
+    selectedSendAsset
+  )
 
   const onToggleShowRestore = React.useCallback(() => {
     if (walletLocation === WalletRoutes.Restore) {
@@ -321,7 +331,7 @@ function Container (props: Props) {
 
     return amounts.reduce(function (a, b) {
       return a !== '' && b !== ''
-        ? addNumericValues(a, b)
+        ? new Amount(a).plus(b).format()
         : ''
     })
   }, [accounts, getAccountBalance])
@@ -353,11 +363,9 @@ function Container (props: Props) {
       })
 
     const grandTotal = visibleAssetFiatBalances.reduce(function (a, b) {
-      return a !== '' && b !== ''
-        ? addNumericValues(a, b)
-        : ''
+      return a.plus(b)
     })
-    return formatWithCommasAndDecimals(grandTotal)
+    return grandTotal.formatAsFiat()
   }, [userAssetList, fullAssetBalance, computeFiatAmount])
 
   const onChangeTimeline = (timeline: BraveWallet.AssetPriceTimeframe) => {
@@ -385,8 +393,8 @@ function Container (props: Props) {
     props.walletPageActions.setShowAddModal(false)
   }
 
-  const onCreateAccount = (name: string) => {
-    const created = props.walletPageActions.addAccount({ accountName: name })
+  const onCreateAccount = (name: string, coin: BraveWallet.CoinType) => {
+    const created = props.walletPageActions.addAccount({ accountName: name, coin: coin })
     if (created) {
       onHideAddModal()
     }
@@ -402,8 +410,8 @@ function Container (props: Props) {
     props.walletPageActions.addHardwareAccounts(selected)
   }
 
-  const onImportAccount = (accountName: string, privateKey: string) => {
-    props.walletPageActions.importAccount({ accountName, privateKey })
+  const onImportAccount = (accountName: string, privateKey: string, coin: BraveWallet.CoinType) => {
+    props.walletPageActions.importAccount({ accountName, privateKey, coin })
   }
 
   const onImportFilecoinAccount = (accountName: string, privateKey: string, network: string, protocol: BraveWallet.FilecoinAddressProtocol) => {
@@ -422,12 +430,12 @@ function Container (props: Props) {
     props.walletPageActions.setImportWalletError({ hasError })
   }
 
-  const onRemoveAccount = (address: string, hardware: boolean) => {
+  const onRemoveAccount = (address: string, hardware: boolean, coin: BraveWallet.CoinType) => {
     if (hardware) {
       props.walletPageActions.removeHardwareAccount({ address })
       return
     }
-    props.walletPageActions.removeImportedAccount({ address })
+    props.walletPageActions.removeImportedAccount({ address, coin })
   }
 
   const onUpdateAccountName = (payload: UpdateAccountNamePayloadType): { success: boolean } => {
@@ -439,8 +447,8 @@ function Container (props: Props) {
     props.walletActions.getAllTokensList()
   }
 
-  const onViewPrivateKey = (address: string, isDefault: boolean) => {
-    props.walletPageActions.viewPrivateKey({ address, isDefault })
+  const onViewPrivateKey = (address: string, isDefault: boolean, coin: BraveWallet.CoinType) => {
+    props.walletPageActions.viewPrivateKey({ address, isDefault, coin })
   }
 
   const onDoneViewingPrivateKey = () => {
@@ -500,6 +508,21 @@ function Container (props: Props) {
     const acceptedAccountRoutes = accounts.map((account) => {
       return `${WalletRoutes.Accounts}/${account.address}`
     })
+
+    const allAcceptedRoutes = [
+      WalletRoutes.Backup,
+      WalletRoutes.Accounts,
+      WalletRoutes.AddAccountModal,
+      WalletRoutes.AddAssetModal,
+      WalletRoutes.Portfolio,
+      ...acceptedPortfolioRoutes,
+      ...acceptedAccountRoutes
+    ]
+
+    if (allAcceptedRoutes.includes(walletLocation)) {
+      setSessionRoute(walletLocation)
+    }
+
     if (!hasInitialized) {
       return
     }
@@ -514,17 +537,15 @@ function Container (props: Props) {
     } else if (
       !isWalletLocked &&
       hasInitialized &&
-      walletLocation !== WalletRoutes.Backup &&
-      walletLocation !== WalletRoutes.Accounts &&
-      walletLocation !== WalletRoutes.AddAccountModal &&
-      walletLocation !== WalletRoutes.AddAssetModal &&
+      !allAcceptedRoutes.includes(walletLocation) &&
       acceptedAccountRoutes.length !== 0 &&
-      !acceptedAccountRoutes.includes(walletLocation) &&
-      walletLocation !== WalletRoutes.Portfolio &&
-      acceptedPortfolioRoutes.length !== 0 &&
-      !acceptedPortfolioRoutes.includes(walletLocation)
+      acceptedPortfolioRoutes.length !== 0
     ) {
-      history.push(WalletRoutes.Portfolio)
+      if (sessionRoute) {
+        history.push(sessionRoute)
+      } else {
+        history.push(WalletRoutes.Portfolio)
+      }
     }
   }, [
     walletLocation,
@@ -567,8 +588,8 @@ function Container (props: Props) {
               onPasswordProvided={passwordProvided}
               onSubmit={completeWalletSetup}
               onShowRestore={onToggleShowRestore}
-              braveLegacyWalletDetected={isCryptoWalletsInstalled}
-              metaMaskWalletDetected={isMetaMaskInstalled}
+              isCryptoWalletsInitialized={isCryptoWalletsInitialized}
+              isMetaMaskInitialized={isMetaMaskInitialized}
               importError={importWalletError}
               onSetImportError={onSetImportWalletError}
               onImportCryptoWallets={onImportCryptoWallets}
@@ -624,6 +645,8 @@ function Container (props: Props) {
                 onCreateAccount={onCreateAccount}
                 onImportAccount={onImportAccount}
                 onImportFilecoinAccount={onImportFilecoinAccount}
+                isFilecoinEnabled={isFilecoinEnabled}
+                isSolanaEnabled={isSolanaEnabled}
                 isLoading={isFetchingPriceHistory}
                 showAddModal={showAddModal}
                 onHideAddModal={onHideAddModal}

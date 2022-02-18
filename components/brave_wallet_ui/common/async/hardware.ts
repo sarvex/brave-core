@@ -50,11 +50,14 @@ export async function signTrezorTransaction (
   txInfo: BraveWallet.TransactionInfo,
   deviceKeyring: TrezorBridgeKeyring = getTrezorHardwareKeyring()): Promise<SignHardwareTransactionType> {
   const chainId = await apiProxy.jsonRpcService.getChainId()
-  const nonce = await apiProxy.ethTxService.getNonceForHardwareTransaction(txInfo.id)
+  const nonce = await apiProxy.ethTxManagerProxy.getNonceForHardwareTransaction(txInfo.id)
   if (!nonce || !nonce.nonce) {
     return { success: false, error: getLocale('braveWalletApproveTransactionError') }
   }
-  txInfo.txData.baseData.nonce = nonce.nonce
+  if (!txInfo.txDataUnion.ethTxData1559) {
+    return { success: false, error: getLocale('braveWalletApproveTransactionError') }
+  }
+  txInfo.txDataUnion.ethTxData1559.baseData.nonce = nonce.nonce
   const signed = await deviceKeyring.signTransaction(path, txInfo, chainId.chainId)
   if (!signed || !signed.success || !signed.payload) {
     const error = signed.error ? signed.error : getLocale('braveWalletSignOnDeviceError')
@@ -65,7 +68,7 @@ export async function signTrezorTransaction (
   }
   const { v, r, s } = signed.payload
   const result =
-    await apiProxy.ethTxService.processHardwareSignature(txInfo.id, v, r, s)
+    await apiProxy.ethTxManagerProxy.processHardwareSignature(txInfo.id, v, r, s)
   if (!result.status) {
     return { success: false, error: getLocale('braveWalletProcessTransactionError') }
   }
@@ -77,11 +80,11 @@ export async function signLedgerTransaction (
   path: string,
   txInfo: BraveWallet.TransactionInfo,
   deviceKeyring: LedgerBridgeKeyring = getLedgerHardwareKeyring(BraveWallet.CoinType.ETH) as LedgerBridgeKeyring): Promise<SignHardwareTransactionOperationResult> {
-  const nonce = await apiProxy.ethTxService.getNonceForHardwareTransaction(txInfo.id)
+  const nonce = await apiProxy.ethTxManagerProxy.getNonceForHardwareTransaction(txInfo.id)
   if (!nonce || !nonce.nonce) {
     return { success: false, error: getLocale('braveWalletApproveTransactionError') }
   }
-  const data = await apiProxy.ethTxService.getTransactionMessageToSign(txInfo.id)
+  const data = await apiProxy.txService.getTransactionMessageToSign(BraveWallet.CoinType.ETH, txInfo.id)
   if (!data || !data.message) {
     return { success: false, error: getLocale('braveWalletNoMessageToSignError') }
   }
@@ -96,19 +99,29 @@ export async function signLedgerTransaction (
     return { success: false, error: error, code: code }
   }
   const { v, r, s } = signed.payload
-  const result = await apiProxy.ethTxService.processHardwareSignature(txInfo.id, '0x' + v, '0x' + r, '0x' + s)
+  const result = await apiProxy.ethTxManagerProxy.processHardwareSignature(txInfo.id, '0x' + v, '0x' + r, '0x' + s)
   if (!result || !result.status) {
     return { success: false, error: getLocale('braveWalletProcessTransactionError') }
   }
   return { success: result.status }
 }
 
-export async function signMessageWithHardwareKeyring (vendor: HardwareVendor, path: string, message: string): Promise<SignHardwareMessageOperationResult> {
+export async function signMessageWithHardwareKeyring (vendor: HardwareVendor, path: string, messageData: BraveWallet.SignMessageRequest): Promise<SignHardwareMessageOperationResult> {
   const deviceKeyring = getHardwareKeyring(vendor)
   if (deviceKeyring instanceof LedgerBridgeKeyring) {
-    return deviceKeyring.signPersonalMessage(path, message)
+    if (messageData.isEip712) {
+      if (!messageData.domainHash || !messageData.primaryHash) {
+        return { success: false, error: getLocale('braveWalletUnknownInternalError') }
+      }
+      return deviceKeyring.signEip712Message(path, messageData.domainHash, messageData?.primaryHash)
+    } else return deviceKeyring.signPersonalMessage(path, messageData.message)
   } else if (deviceKeyring instanceof TrezorBridgeKeyring) {
-    return deviceKeyring.signPersonalMessage(path, message)
+    if (messageData.isEip712) {
+      if (!messageData.domainHash || !messageData.primaryHash) {
+        return { success: false, error: getLocale('braveWalletUnknownInternalError') }
+      }
+      return deviceKeyring.signEip712Message(path, messageData.domainHash, messageData.primaryHash)
+    } else return deviceKeyring.signPersonalMessage(path, messageData.message)
   }
   return { success: false, error: getLocale('braveWalletUnknownKeyringError') }
 }

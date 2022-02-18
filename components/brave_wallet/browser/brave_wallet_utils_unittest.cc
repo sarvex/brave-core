@@ -31,7 +31,7 @@ namespace {
 void UpdateCustomNetworks(PrefService* prefs,
                           std::vector<base::Value>* values) {
   ListPrefUpdate update(prefs, kBraveWalletCustomNetworks);
-  base::ListValue* list = update.Get();
+  base::Value* list = update.Get();
   list->ClearList();
   for (auto& it : *values) {
     list->Append(std::move(it));
@@ -622,20 +622,6 @@ TEST(BraveWalletUtilsUnitTest, DecodeStringArray) {
       &output));
 }
 
-TEST(BraveWalletUtilsUnitTest, SecureZeroData) {
-  int a = 123;
-  SecureZeroData(&a, sizeof(a));
-  EXPECT_EQ(a, 0);
-  std::string b = "brave";
-  SecureZeroData(&b, sizeof(b));
-  EXPECT_TRUE(b.empty());
-  std::vector<uint8_t> c = {0xde, 0xad, 0xbe, 0xef};
-  SecureZeroData(&c, sizeof(c));
-  for (const auto& byte : c) {
-    EXPECT_EQ(byte, 0);
-  }
-}
-
 TEST(BraveWalletUtilsUnitTest, TransactionReceiptAndValue) {
   TransactionReceipt tx_receipt;
   tx_receipt.transaction_hash =
@@ -876,8 +862,7 @@ TEST(BraveWalletUtilsUnitTest, AddCustomNetwork) {
 
   // Asset list of new custom chains should have native asset in
   // kBraveWalletUserAssets.
-  const base::DictionaryValue* assets_pref =
-      prefs.GetDictionary(kBraveWalletUserAssets);
+  const base::Value* assets_pref = prefs.GetDictionary(kBraveWalletUserAssets);
   const base::Value* list1 = assets_pref->FindKey("chain_id");
   ASSERT_TRUE(list1->is_list());
   base::Value::ConstListView asset_list1 = list1->GetList();
@@ -905,6 +890,28 @@ TEST(BraveWalletUtilsUnitTest, AddCustomNetwork) {
   EXPECT_EQ(*asset_list2[0].FindIntKey("decimals"), 22);
   EXPECT_EQ(*asset_list2[0].FindStringKey("logo"), "");
   EXPECT_EQ(*asset_list2[0].FindBoolKey("visible"), true);
+}
+
+TEST(BraveWalletUtilsUnitTest, GetFirstValidChainURL) {
+  std::vector<std::string> urls = {
+      "https://goerli.infura.io/v3/${INFURA_API_KEY}",
+      "https://goerli.alchemy.io/v3/${ALCHEMY_API_KEY}",
+      "https://goerli.apikey.io/v3/${API_KEY}",
+      "https://goerli.apikey.io/v3/${PULSECHAIN_API_KEY}",
+      "wss://goerli.infura.io/v3/"};
+
+  // Uses the first URL when a good URL is not available
+  GURL url = GetFirstValidChainURL(urls);
+  EXPECT_EQ(url, GURL("https://goerli.infura.io/v3/${INFURA_API_KEY}"));
+
+  urls.push_back("https://goerli.infura.io/v3/rpc");
+  urls.push_back("https://goerli.infura.io/v3/rpc2");
+  // Uses the first HTTP(S) URL without a variable when possible
+  url = GetFirstValidChainURL(urls);
+  EXPECT_EQ(url, GURL("https://goerli.infura.io/v3/rpc"));
+
+  // Empty URL spec list returns an empty URL
+  EXPECT_EQ(GetFirstValidChainURL(std::vector<std::string>()), GURL());
 }
 
 }  // namespace brave_wallet

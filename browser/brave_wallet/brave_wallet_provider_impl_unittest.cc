@@ -21,21 +21,21 @@
 #include "brave/browser/brave_wallet/brave_wallet_provider_delegate_impl_helper.h"
 #include "brave/browser/brave_wallet/brave_wallet_service_factory.h"
 #include "brave/browser/brave_wallet/brave_wallet_tab_helper.h"
-#include "brave/browser/brave_wallet/eth_tx_service_factory.h"
 #include "brave/browser/brave_wallet/json_rpc_service_factory.h"
 #include "brave/browser/brave_wallet/keyring_service_factory.h"
+#include "brave/browser/brave_wallet/tx_service_factory.h"
 #include "brave/components/brave_wallet/browser/asset_ratio_service.h"
 #include "brave/components/brave_wallet/browser/brave_wallet_service.h"
 #include "brave/components/brave_wallet/browser/brave_wallet_utils.h"
 #include "brave/components/brave_wallet/browser/eth_nonce_tracker.h"
 #include "brave/components/brave_wallet/browser/eth_pending_tx_tracker.h"
-#include "brave/components/brave_wallet/browser/eth_tx_service.h"
 #include "brave/components/brave_wallet/browser/eth_tx_state_manager.h"
 #include "brave/components/brave_wallet/browser/ethereum_permission_utils.h"
 #include "brave/components/brave_wallet/browser/hd_keyring.h"
 #include "brave/components/brave_wallet/browser/json_rpc_service.h"
 #include "brave/components/brave_wallet/browser/keyring_service.h"
 #include "brave/components/brave_wallet/browser/pref_names.h"
+#include "brave/components/brave_wallet/browser/tx_service.h"
 #include "brave/components/brave_wallet/common/brave_wallet.mojom.h"
 #include "brave/components/brave_wallet/common/hex_utils.h"
 #include "brave/components/brave_wallet/common/web3_provider_constants.h"
@@ -79,6 +79,12 @@ void ValidateErrorCode(BraveWalletProviderImpl* provider,
             callback_is_called = true;
           }));
   ASSERT_TRUE(callback_is_called);
+}
+
+std::vector<uint8_t> DecodeHexHash(const std::string& hash_hex) {
+  std::vector<uint8_t> hash;
+  base::HexStringToBytes(hash_hex, &hash);
+  return hash;
 }
 
 }  // namespace
@@ -166,16 +172,14 @@ class BraveWalletProviderImplUnitTest : public testing::Test {
         AssetRatioServiceFactory::GetServiceForContext(browser_context());
     asset_ratio_service_->SetAPIRequestHelperForTesting(
         shared_url_loader_factory_);
-    eth_tx_service_ =
-        EthTxServiceFactory::GetServiceForContext(browser_context());
+    tx_service_ = TxServiceFactory::GetServiceForContext(browser_context());
     brave_wallet_service_ =
         brave_wallet::BraveWalletServiceFactory::GetServiceForContext(
             browser_context());
 
     provider_ = std::make_unique<BraveWalletProviderImpl>(
-        host_content_settings_map(), json_rpc_service(),
-        eth_tx_service()->MakeRemote(), keyring_service(),
-        brave_wallet_service_,
+        host_content_settings_map(), json_rpc_service(), tx_service(),
+        keyring_service(), brave_wallet_service_,
         std::make_unique<brave_wallet::BraveWalletProviderDelegateImpl>(
             web_contents(), web_contents()->GetMainFrame()),
         prefs());
@@ -216,7 +220,8 @@ class BraveWalletProviderImplUnitTest : public testing::Test {
   void AddAccount() {
     base::RunLoop run_loop;
     keyring_service_->AddAccount(
-        "New Account", base::BindLambdaForTesting([&run_loop](bool success) {
+        "New Account", mojom::CoinType::ETH,
+        base::BindLambdaForTesting([&run_loop](bool success) {
           EXPECT_TRUE(success);
           run_loop.Quit();
         }));
@@ -292,7 +297,7 @@ class BraveWalletProviderImplUnitTest : public testing::Test {
   ~BraveWalletProviderImplUnitTest() override = default;
 
   content::TestWebContents* web_contents() { return web_contents_.get(); }
-  EthTxService* eth_tx_service() { return eth_tx_service_; }
+  TxService* tx_service() { return tx_service_; }
   JsonRpcService* json_rpc_service() { return json_rpc_service_; }
   KeyringService* keyring_service() { return keyring_service_; }
   BraveWalletProviderImpl* provider() { return provider_.get(); }
@@ -425,7 +430,8 @@ class BraveWalletProviderImplUnitTest : public testing::Test {
   void SignTypedMessage(absl::optional<bool> user_approved,
                         const std::string& address,
                         const std::string& message,
-                        const std::string& message_to_sign,
+                        const std::vector<uint8_t>& domain_hash,
+                        const std::vector<uint8_t>& primary_hash,
                         base::Value&& domain,
                         std::string* signature_out,
                         mojom::ProviderError* error_out,
@@ -435,7 +441,7 @@ class BraveWalletProviderImplUnitTest : public testing::Test {
 
     base::RunLoop run_loop;
     provider()->SignTypedMessage(
-        address, message, message_to_sign, std::move(domain),
+        address, message, domain_hash, primary_hash, std::move(domain),
         base::BindLambdaForTesting([&](const std::string& signature,
                                        mojom::ProviderError error,
                                        const std::string& error_message) {
@@ -505,22 +511,29 @@ class BraveWalletProviderImplUnitTest : public testing::Test {
   std::vector<mojom::TransactionInfoPtr> GetAllTransactionInfo() {
     std::vector<mojom::TransactionInfoPtr> transaction_infos;
     base::RunLoop run_loop;
-    eth_tx_service()->GetAllTransactionInfo(
-        from(), base::BindLambdaForTesting(
-                    [&](std::vector<mojom::TransactionInfoPtr> v) {
-                      transaction_infos = std::move(v);
-                      run_loop.Quit();
-                    }));
+    tx_service()->GetAllTransactionInfo(
+        mojom::CoinType::ETH, from(),
+        base::BindLambdaForTesting(
+            [&](std::vector<mojom::TransactionInfoPtr> v) {
+              transaction_infos = std::move(v);
+              run_loop.Quit();
+            }));
     run_loop.Run();
     return transaction_infos;
   }
 
-  bool ApproveTransaction(const std::string& tx_meta_id) {
+  bool ApproveTransaction(const std::string& tx_meta_id,
+                          mojom::ProviderError* error_out,
+                          std::string* error_message_out) {
     bool success;
     base::RunLoop run_loop;
-    eth_tx_service()->ApproveTransaction(
-        tx_meta_id, base::BindLambdaForTesting([&](bool v) {
+    tx_service()->ApproveTransaction(
+        mojom::CoinType::ETH, tx_meta_id,
+        base::BindLambdaForTesting([&](bool v, mojom::ProviderError error,
+                                       const std::string& error_message) {
           success = v;
+          *error_out = error;
+          *error_message_out = error_message;
           run_loop.Quit();
         }));
     run_loop.Run();
@@ -591,14 +604,14 @@ class BraveWalletProviderImplUnitTest : public testing::Test {
 
  protected:
   content::BrowserTaskEnvironment browser_task_environment_;
-  JsonRpcService* json_rpc_service_;
+  raw_ptr<JsonRpcService> json_rpc_service_ = nullptr;
   raw_ptr<BraveWalletService> brave_wallet_service_ = nullptr;
   std::unique_ptr<TestEventsListener> observer_;
 
  private:
   raw_ptr<KeyringService> keyring_service_ = nullptr;
   content::TestWebContentsFactory factory_;
-  raw_ptr<EthTxService> eth_tx_service_;
+  raw_ptr<TxService> tx_service_;
   raw_ptr<AssetRatioService> asset_ratio_service_;
   std::unique_ptr<content::TestWebContents> web_contents_;
   std::unique_ptr<BraveWalletProviderImpl> provider_;
@@ -638,9 +651,8 @@ TEST_F(BraveWalletProviderImplUnitTest, ValidateBrokenPayloads) {
 
 TEST_F(BraveWalletProviderImplUnitTest, EmptyDelegate) {
   BraveWalletProviderImpl provider_impl(
-      host_content_settings_map(), json_rpc_service(),
-      eth_tx_service()->MakeRemote(), keyring_service(), brave_wallet_service_,
-      nullptr, prefs());
+      host_content_settings_map(), json_rpc_service(), tx_service(),
+      keyring_service(), brave_wallet_service_, nullptr, prefs());
   ValidateErrorCode(&provider_impl,
                     R"({"params": [{
         "chainId": "0x111",
@@ -744,9 +756,14 @@ TEST_F(BraveWalletProviderImplUnitTest, AddAndApproveTransaction) {
   // eth_getTransactionCount and eth_sendRawTransaction
   SetInterceptor("{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":\"0x0\"}");
 
-  EXPECT_TRUE(ApproveTransaction(infos[0]->id));
+  mojom::ProviderError error = mojom::ProviderError::kUnknown;
+  std::string error_message;
+
+  EXPECT_TRUE(ApproveTransaction(infos[0]->id, &error, &error_message));
   base::RunLoop().RunUntilIdle();
 
+  EXPECT_EQ(error, mojom::ProviderError::kSuccess);
+  EXPECT_TRUE(error_message.empty());
   EXPECT_TRUE(callback_called);
   infos = GetAllTransactionInfo();
   ASSERT_EQ(infos.size(), 1UL);
@@ -757,7 +774,7 @@ TEST_F(BraveWalletProviderImplUnitTest, AddAndApproveTransaction) {
 
 TEST_F(BraveWalletProviderImplUnitTest, AddAndApproveTransactionError) {
   // We don't need to check every error type since that is checked by
-  // eth_tx_service_unittest but make sure an error type is handled
+  // eth_tx_manager_unittest but make sure an error type is handled
   // correctly.
   bool callback_called = false;
   CreateWallet();
@@ -836,9 +853,14 @@ TEST_F(BraveWalletProviderImplUnitTest, AddAndApprove1559Transaction) {
   // eth_getTransactionCount and eth_sendRawTransaction
   SetInterceptor("{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":\"0x0\"}");
 
-  EXPECT_TRUE(ApproveTransaction(infos[0]->id));
+  mojom::ProviderError error = mojom::ProviderError::kUnknown;
+  std::string error_message;
+
+  EXPECT_TRUE(ApproveTransaction(infos[0]->id, &error, &error_message));
   base::RunLoop().RunUntilIdle();
 
+  EXPECT_EQ(error, mojom::ProviderError::kSuccess);
+  EXPECT_TRUE(error_message.empty());
   EXPECT_TRUE(callback_called);
   infos = GetAllTransactionInfo();
   ASSERT_EQ(infos.size(), 1UL);
@@ -854,6 +876,9 @@ TEST_F(BraveWalletProviderImplUnitTest, AddAndApprove1559TransactionNoChainId) {
   GURL url("https://brave.com");
   Navigate(url);
   SetNetwork("0x4");
+  // Wait for EthTxStateManager::ChainChangedEvent to be called.
+  browser_task_environment_.RunUntilIdle();
+
   AddEthereumPermission(url);
   // Chain ID as 0x0
   provider()->AddAndApprove1559Transaction(
@@ -892,13 +917,14 @@ TEST_F(BraveWalletProviderImplUnitTest, AddAndApprove1559TransactionNoChainId) {
 
   std::vector<mojom::TransactionInfoPtr> infos = GetAllTransactionInfo();
   ASSERT_EQ(infos.size(), 2UL);
-  EXPECT_EQ(infos[0]->tx_data->chain_id, "0x4");
-  EXPECT_EQ(infos[1]->tx_data->chain_id, "0x4");
+  ASSERT_TRUE(infos[0]->tx_data_union->is_eth_tx_data_1559());
+  EXPECT_EQ(infos[0]->tx_data_union->get_eth_tx_data_1559()->chain_id, "0x4");
+  EXPECT_EQ(infos[1]->tx_data_union->get_eth_tx_data_1559()->chain_id, "0x4");
 }
 
 TEST_F(BraveWalletProviderImplUnitTest, AddAndApprove1559TransactionError) {
   // We don't need to check every error type since that is checked by
-  // eth_tx_service_unittest but make sure an error type is handled
+  // eth_tx_manager_unittest but make sure an error type is handled
   // correctly.
   bool callback_called = false;
   CreateWallet();
@@ -1197,22 +1223,25 @@ TEST_F(BraveWalletProviderImplUnitTest, SignTypedMessage) {
   EXPECT_EQ(json_rpc_service()->GetChainId(), "0x1");
   CreateWallet();
   AddAccount();
-  const std::string valid_message_to_sign =
-      "be609aee343fb3c4b28e1df9e632fca64fcfaede20f02e86244efddf30957bd2";
   std::string signature;
   mojom::ProviderError error;
   std::string error_message;
   base::Value domain(base::Value::Type::DICTIONARY);
+  std::vector<uint8_t> domain_hash = DecodeHexHash(
+      "f2cee375fa42b42143804025fc449deafd50cc031ca257e0b194a650a912090f");
+  std::vector<uint8_t> primary_hash = DecodeHexHash(
+      "c52c0ee5d84264471806290a3f2c4cecfc5490626bf912d01f240d7a274b371e");
   domain.SetIntKey("chainId", 1);
-  SignTypedMessage(absl::nullopt, "1234", "{...}", valid_message_to_sign,
+  SignTypedMessage(absl::nullopt, "1234", "{...}", domain_hash, primary_hash,
                    domain.Clone(), &signature, &error, &error_message);
   EXPECT_TRUE(signature.empty());
   EXPECT_EQ(error, mojom::ProviderError::kInvalidParams);
   EXPECT_EQ(error_message,
             l10n_util::GetStringUTF8(IDS_WALLET_INVALID_PARAMETERS));
 
-  SignTypedMessage(absl::nullopt, "0x12345678", "{...}", valid_message_to_sign,
-                   domain.Clone(), &signature, &error, &error_message);
+  SignTypedMessage(absl::nullopt, "0x12345678", "{...}", domain_hash,
+                   primary_hash, domain.Clone(), &signature, &error,
+                   &error_message);
   EXPECT_TRUE(signature.empty());
   EXPECT_EQ(error, mojom::ProviderError::kInvalidParams);
   EXPECT_EQ(error_message,
@@ -1220,24 +1249,24 @@ TEST_F(BraveWalletProviderImplUnitTest, SignTypedMessage) {
 
   const std::string address = "0x1234567890123456789012345678901234567890";
   // domain not dict
-  SignTypedMessage(absl::nullopt, address, "{...}", valid_message_to_sign,
+  SignTypedMessage(absl::nullopt, address, "{...}", domain_hash, primary_hash,
                    base::Value("not dict"), &signature, &error, &error_message);
   EXPECT_TRUE(signature.empty());
   EXPECT_EQ(error, mojom::ProviderError::kInvalidParams);
   EXPECT_EQ(error_message,
             l10n_util::GetStringUTF8(IDS_WALLET_INVALID_PARAMETERS));
 
-  // not valid hex
-  SignTypedMessage(absl::nullopt, address, "{...}", "brave", domain.Clone(),
-                   &signature, &error, &error_message);
+  // not valid domain hash
+  SignTypedMessage(absl::nullopt, address, "{...}", {}, primary_hash,
+                   domain.Clone(), &signature, &error, &error_message);
   EXPECT_TRUE(signature.empty());
   EXPECT_EQ(error, mojom::ProviderError::kInvalidParams);
   EXPECT_EQ(error_message,
             l10n_util::GetStringUTF8(IDS_WALLET_INVALID_PARAMETERS));
 
-  // not valid eip712 hash
-  SignTypedMessage(absl::nullopt, address, "{...}", "deadbeef", domain.Clone(),
-                   &signature, &error, &error_message);
+  // not valid primary hash
+  SignTypedMessage(absl::nullopt, address, "{...}", domain_hash, {},
+                   domain.Clone(), &signature, &error, &error_message);
   EXPECT_TRUE(signature.empty());
   EXPECT_EQ(error, mojom::ProviderError::kInvalidParams);
   EXPECT_EQ(error_message,
@@ -1246,7 +1275,7 @@ TEST_F(BraveWalletProviderImplUnitTest, SignTypedMessage) {
   domain.SetIntKey("chainId", 4);
   std::string chain_id = "0x4";
   // not active network
-  SignTypedMessage(absl::nullopt, address, "{...}", valid_message_to_sign,
+  SignTypedMessage(absl::nullopt, address, "{...}", domain_hash, primary_hash,
                    domain.Clone(), &signature, &error, &error_message);
   EXPECT_TRUE(signature.empty());
   EXPECT_EQ(error, mojom::ProviderError::kInternalError);
@@ -1256,7 +1285,7 @@ TEST_F(BraveWalletProviderImplUnitTest, SignTypedMessage) {
                 base::ASCIIToUTF16(chain_id)));
   domain.SetIntKey("chainId", 1);
 
-  SignTypedMessage(absl::nullopt, address, "{...}", valid_message_to_sign,
+  SignTypedMessage(absl::nullopt, address, "{...}", domain_hash, primary_hash,
                    domain.Clone(), &signature, &error, &error_message);
   EXPECT_TRUE(signature.empty());
   EXPECT_EQ(error, mojom::ProviderError::kUnauthorized);
@@ -1267,8 +1296,9 @@ TEST_F(BraveWalletProviderImplUnitTest, SignTypedMessage) {
   // No permission
   const std::vector<std::string> addresses = GetAddresses();
   ASSERT_FALSE(address.empty());
-  SignTypedMessage(absl::nullopt, addresses[0], "{...}", valid_message_to_sign,
-                   domain.Clone(), &signature, &error, &error_message);
+  SignTypedMessage(absl::nullopt, addresses[0], "{...}", domain_hash,
+                   primary_hash, domain.Clone(), &signature, &error,
+                   &error_message);
   EXPECT_TRUE(signature.empty());
   EXPECT_EQ(error, mojom::ProviderError::kUnauthorized);
   EXPECT_EQ(error_message,
@@ -1277,7 +1307,7 @@ TEST_F(BraveWalletProviderImplUnitTest, SignTypedMessage) {
   GURL url("https://brave.com");
   Navigate(url);
   AddEthereumPermission(url);
-  SignTypedMessage(true, addresses[0], "{...}", valid_message_to_sign,
+  SignTypedMessage(true, addresses[0], "{...}", domain_hash, primary_hash,
                    domain.Clone(), &signature, &error, &error_message);
 
   EXPECT_FALSE(signature.empty());
@@ -1285,19 +1315,35 @@ TEST_F(BraveWalletProviderImplUnitTest, SignTypedMessage) {
   EXPECT_TRUE(error_message.empty());
 
   // User reject request
-  SignTypedMessage(false, addresses[0], "{...}", valid_message_to_sign,
+  SignTypedMessage(false, addresses[0], "{...}", domain_hash, primary_hash,
                    domain.Clone(), &signature, &error, &error_message);
   EXPECT_TRUE(signature.empty());
   EXPECT_EQ(error, mojom::ProviderError::kUserRejectedRequest);
   EXPECT_EQ(error_message,
             l10n_util::GetStringUTF8(IDS_WALLET_USER_REJECTED_REQUEST));
-
+  // not valid eip712 domain hash
+  SignTypedMessage(absl::nullopt, address, "{...}", DecodeHexHash("brave"),
+                   primary_hash, domain.Clone(), &signature, &error,
+                   &error_message);
+  EXPECT_TRUE(signature.empty());
+  EXPECT_EQ(error, mojom::ProviderError::kInvalidParams);
+  EXPECT_EQ(error_message,
+            l10n_util::GetStringUTF8(IDS_WALLET_INVALID_PARAMETERS));
+  // not valid eip712 primary hash
+  SignTypedMessage(absl::nullopt, address, "{...}", domain_hash,
+                   DecodeHexHash("primary"), domain.Clone(), &signature, &error,
+                   &error_message);
+  EXPECT_TRUE(signature.empty());
+  EXPECT_EQ(error, mojom::ProviderError::kInvalidParams);
+  EXPECT_EQ(error_message,
+            l10n_util::GetStringUTF8(IDS_WALLET_INVALID_PARAMETERS));
   keyring_service()->Lock();
 
   // nullopt for the first param here because we don't AddSignMessageRequest
   // whent here are no accounts returned.
-  SignTypedMessage(absl::nullopt, addresses[0], "{...}", valid_message_to_sign,
-                   domain.Clone(), &signature, &error, &error_message);
+  SignTypedMessage(absl::nullopt, addresses[0], "{...}", domain_hash,
+                   primary_hash, domain.Clone(), &signature, &error,
+                   &error_message);
   EXPECT_TRUE(signature.empty());
   EXPECT_EQ(error, mojom::ProviderError::kUnauthorized);
   EXPECT_EQ(error_message,

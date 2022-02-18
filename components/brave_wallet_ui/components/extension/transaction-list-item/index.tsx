@@ -12,10 +12,6 @@ import {
 import { toProperCase } from '../../../utils/string-utils'
 import { getTransactionStatusString } from '../../../utils/tx-utils'
 import { mojoTimeDeltaToJSDate, formatDateAsRelative } from '../../../utils/datetime-utils'
-import {
-  formatFiatAmountWithCommasAndDecimals,
-  formatTokenAmountWithCommasAndDecimals
-} from '../../../utils/format-prices'
 
 // Hooks
 import { useTransactionParser } from '../../../common/hooks'
@@ -132,7 +128,7 @@ const TransactionsListItem = (props: Props) => {
       }
 
       // FIXME: Add as new TransactionType on the service side.
-      case transaction.txData.baseData.to.toLowerCase() === SwapExchangeProxy: {
+      case transaction.txDataUnion.ethTxData1559?.baseData.to.toLowerCase() === SwapExchangeProxy: {
         return (
           <>
             <DetailRow>
@@ -193,8 +189,13 @@ const TransactionsListItem = (props: Props) => {
       </TransactionDetailRow>
       <DetailRow>
         <BalanceColumn>
-          <DetailTextDark>{formatFiatAmountWithCommasAndDecimals(transactionDetails.fiatValue, defaultCurrencies.fiat)}</DetailTextDark>
-          <DetailTextLight>{formatTokenAmountWithCommasAndDecimals(transactionDetails.nativeCurrencyTotal, selectedNetwork.symbol)}</DetailTextLight>
+          <DetailTextDark>
+            {
+              transactionDetails.fiatValue
+                .formatAsFiat(defaultCurrencies.fiat)
+            }
+          </DetailTextDark>
+          <DetailTextLight>{transactionDetails.formattedNativeCurrencyTotal}</DetailTextLight>
           <StatusRow>
             <StatusBubble status={transactionDetails.status} />
             <DetailTextDarkBold>

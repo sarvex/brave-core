@@ -15,10 +15,10 @@
 #include "brave/components/brave_wallet/browser/blockchain_registry.h"
 #include "brave/components/brave_wallet/browser/brave_wallet_prefs.h"
 #include "brave/components/brave_wallet/browser/brave_wallet_utils.h"
-#include "brave/components/brave_wallet/browser/eth_tx_service.h"
 #include "brave/components/brave_wallet/browser/json_rpc_service.h"
 #include "brave/components/brave_wallet/browser/keyring_service.h"
 #include "brave/components/brave_wallet/browser/pref_names.h"
+#include "brave/components/brave_wallet/browser/tx_service.h"
 #include "brave/components/brave_wallet/common/eth_address.h"
 #include "brave/components/brave_wallet/common/hex_utils.h"
 #include "brave/components/brave_wallet/common/value_conversion_utils.h"
@@ -113,13 +113,14 @@ BraveWalletService::BraveWalletService(
     std::unique_ptr<BraveWalletServiceDelegate> delegate,
     KeyringService* keyring_service,
     JsonRpcService* json_rpc_service,
-    EthTxService* eth_tx_service,
+    TxService* tx_service,
     PrefService* prefs)
     : delegate_(std::move(delegate)),
       keyring_service_(keyring_service),
       json_rpc_service_(json_rpc_service),
-      eth_tx_service_(eth_tx_service),
+      tx_service_(tx_service),
       prefs_(prefs),
+      brave_wallet_p3a_(this, keyring_service, prefs),
       weak_ptr_factory_(this) {
   if (delegate_)
     delegate_->AddObserver(this);
@@ -198,7 +199,7 @@ void BraveWalletService::GetUserAssets(const std::string& chain_id,
     return;
   }
 
-  const base::DictionaryValue* user_assets_dict =
+  const base::Value* user_assets_dict =
       prefs_->GetDictionary(kBraveWalletUserAssets);
   if (!user_assets_dict) {
     std::move(callback).Run(std::vector<mojom::BlockchainTokenPtr>());
@@ -244,7 +245,7 @@ bool BraveWalletService::AddUserAsset(mojom::BlockchainTokenPtr token,
   }
 
   DictionaryPrefUpdate update(prefs_, kBraveWalletUserAssets);
-  base::DictionaryValue* user_assets_pref = update.Get();
+  base::Value* user_assets_pref = update.Get();
 
   base::Value* user_assets_list = user_assets_pref->FindKey(network_id);
   if (!user_assets_list) {
@@ -298,7 +299,7 @@ bool BraveWalletService::RemoveUserAsset(mojom::BlockchainTokenPtr token,
     return false;
 
   DictionaryPrefUpdate update(prefs_, kBraveWalletUserAssets);
-  base::DictionaryValue* user_assets_pref = update.Get();
+  base::Value* user_assets_pref = update.Get();
 
   base::Value* user_assets_list = user_assets_pref->FindKey(network_id);
   if (!user_assets_list)
@@ -335,7 +336,7 @@ bool BraveWalletService::SetUserAssetVisible(mojom::BlockchainTokenPtr token,
     return false;
 
   DictionaryPrefUpdate update(prefs_, kBraveWalletUserAssets);
-  base::DictionaryValue* user_assets_pref = update.Get();
+  base::Value* user_assets_pref = update.Get();
 
   base::Value* user_assets_list = user_assets_pref->FindKey(network_id);
   if (!user_assets_list)
@@ -364,7 +365,7 @@ mojom::BlockchainTokenPtr BraveWalletService::GetUserAsset(
   if (network_id.empty())
     return nullptr;
 
-  const base::DictionaryValue* user_assets_dict =
+  const base::Value* user_assets_dict =
       prefs_->GetDictionary(kBraveWalletUserAssets);
   if (!user_assets_dict)
     return nullptr;
@@ -517,7 +518,7 @@ void BraveWalletService::MigrateUserAssetEthContractAddress(
     return;
 
   DictionaryPrefUpdate update(prefs, kBraveWalletUserAssets);
-  base::DictionaryValue* user_assets_pref = update.Get();
+  base::Value* user_assets_pref = update.Get();
 
   for (auto user_asset_list : user_assets_pref->DictItems()) {
     auto it = FindAsset(&user_asset_list.second, "eth", "", false);
@@ -784,8 +785,8 @@ void BraveWalletService::OnNetworkChanged() {
 }
 
 void BraveWalletService::Reset() {
-  if (eth_tx_service_)
-    eth_tx_service_->Reset();
+  if (tx_service_)
+    tx_service_->Reset();
   if (json_rpc_service_)
     json_rpc_service_->Reset();
 

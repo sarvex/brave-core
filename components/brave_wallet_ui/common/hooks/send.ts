@@ -5,7 +5,6 @@
 
 import * as React from 'react'
 import { SimpleActionCreator } from 'redux-act'
-import BigNumber from 'bignumber.js'
 
 import {
   BraveWallet,
@@ -17,9 +16,11 @@ import {
   GetChecksumEthAddressReturnInfo,
   AmountValidationErrorType
 } from '../../constants/types'
-import { isValidAddress } from '../../utils/address-utils'
 import { getLocale } from '../../../common/locale'
-import { toWeiHex } from '../../utils/format-balances'
+
+// Utils
+import { isValidAddress } from '../../utils/address-utils'
+import Amount from '../../utils/amount'
 
 export default function useSend (
   findENSAddress: (address: string) => Promise<GetEthAddrReturnInfo>,
@@ -32,7 +33,8 @@ export default function useSend (
   sendERC721TransferFrom: SimpleActionCreator<ERC721TransferFromParams>,
   fullTokenList: BraveWallet.BlockchainToken[]
 ) {
-  const [selectedSendAsset, setSelectedSendAsset] = React.useState<BraveWallet.BlockchainToken>(sendAssetOptions[0])
+  // selectedSendAsset can be undefined if sendAssetOptions is an empty array.
+  const [selectedSendAsset, setSelectedSendAsset] = React.useState<BraveWallet.BlockchainToken | undefined>(sendAssetOptions[0])
   const [toAddressOrUrl, setToAddressOrUrl] = React.useState('')
   const [toAddress, setToAddress] = React.useState('')
   const [addressError, setAddressError] = React.useState('')
@@ -74,11 +76,14 @@ export default function useSend (
   }
 
   const sendAmountValidationError: AmountValidationErrorType | undefined = React.useMemo(() => {
-    if (!sendAmount) {
+    if (!sendAmount || !selectedSendAsset) {
       return
     }
 
-    return new BigNumber(sendAmount).times(10 ** selectedSendAsset.decimals).decimalPlaces() > 0
+    const amountBN = new Amount(sendAmount)
+      .multiplyByDecimals(selectedSendAsset.decimals) // ETH → Wei conversion
+      .value // extract BigNumber object wrapped by Amount
+    return amountBN && amountBN.decimalPlaces() > 0
       ? 'fromAmountDecimalsOverflow'
       : undefined
   }, [sendAmount, selectedSendAsset])
@@ -163,23 +168,29 @@ export default function useSend (
     }
 
     // Resets State
-    if (toAddressOrUrl === '') {
+    if (toAddressOrUrl === '' || selectedAccount.coin === BraveWallet.CoinType.FIL) {
       setAddressError('')
       setAddressWarning('')
       setToAddress('')
       return
     }
-
     // Fallback error state
     setAddressWarning('')
     setAddressError(getLocale('braveWalletNotValidAddress'))
   }, [toAddressOrUrl, selectedAccount])
 
   const onSubmitSend = () => {
+    if (!selectedSendAsset) {
+      console.log('Failed to submit Send transaction: no send asset selected')
+      return
+    }
+
     selectedSendAsset.isErc20 && sendERC20Transfer({
       from: selectedAccount.address,
       to: toAddress,
-      value: toWeiHex(sendAmount, selectedSendAsset.decimals),
+      value: new Amount(sendAmount)
+        .multiplyByDecimals(selectedSendAsset.decimals) // ETH → Wei conversion
+        .toHex(),
       contractAddress: selectedSendAsset.contractAddress
     })
 
@@ -194,7 +205,9 @@ export default function useSend (
     !selectedSendAsset.isErc721 && !selectedSendAsset.isErc20 && sendTransaction({
       from: selectedAccount.address,
       to: toAddress,
-      value: toWeiHex(sendAmount, selectedSendAsset.decimals)
+      value: new Amount(sendAmount)
+        .multiplyByDecimals(selectedSendAsset.decimals)
+        .toHex()
     })
 
     setToAddressOrUrl('')

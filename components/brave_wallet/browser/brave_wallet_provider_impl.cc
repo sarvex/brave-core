@@ -5,6 +5,7 @@
 
 #include "brave/components/brave_wallet/browser/brave_wallet_provider_impl.h"
 
+#include <string>
 #include <utility>
 
 #include "base/json/json_reader.h"
@@ -19,7 +20,9 @@
 #include "brave/components/brave_wallet/browser/eth_response_parser.h"
 #include "brave/components/brave_wallet/browser/json_rpc_service.h"
 #include "brave/components/brave_wallet/browser/keyring_service.h"
+#include "brave/components/brave_wallet/browser/tx_service.h"
 #include "brave/components/brave_wallet/common/eth_address.h"
+#include "brave/components/brave_wallet/common/eth_sign_typed_data_helper.h"
 #include "brave/components/brave_wallet/common/hex_utils.h"
 #include "brave/components/brave_wallet/common/value_conversion_utils.h"
 #include "brave/components/brave_wallet/common/web3_provider_constants.h"
@@ -32,7 +35,7 @@ namespace brave_wallet {
 BraveWalletProviderImpl::BraveWalletProviderImpl(
     HostContentSettingsMap* host_content_settings_map,
     JsonRpcService* json_rpc_service,
-    mojo::PendingRemote<mojom::EthTxService> tx_service,
+    TxService* tx_service,
     KeyringService* keyring_service,
     BraveWalletService* brave_wallet_service,
     std::unique_ptr<BraveWalletProviderDelegate> delegate,
@@ -40,6 +43,7 @@ BraveWalletProviderImpl::BraveWalletProviderImpl(
     : host_content_settings_map_(host_content_settings_map),
       delegate_(std::move(delegate)),
       json_rpc_service_(json_rpc_service),
+      tx_service_(tx_service),
       keyring_service_(keyring_service),
       brave_wallet_service_(brave_wallet_service),
       prefs_(prefs),
@@ -49,11 +53,9 @@ BraveWalletProviderImpl::BraveWalletProviderImpl(
       rpc_observer_receiver_.BindNewPipeAndPassRemote());
 
   DCHECK(tx_service);
-  tx_service_.Bind(std::move(tx_service));
-  tx_service_.set_disconnect_handler(base::BindOnce(
-      &BraveWalletProviderImpl::OnConnectionError, weak_factory_.GetWeakPtr()));
   tx_service_->AddObserver(tx_observer_receiver_.BindNewPipeAndPassRemote());
 
+  DCHECK(keyring_service);
   keyring_service_->AddObserver(
       keyring_observer_receiver_.BindNewPipeAndPassRemote());
   host_content_settings_map_->AddObserver(this);
@@ -77,8 +79,9 @@ void BraveWalletProviderImpl::AddEthereumChain(
     return;
   }
 
-  auto json_value =
-      base::JSONReader::Read(json_payload, base::JSON_ALLOW_TRAILING_COMMAS);
+  auto json_value = base::JSONReader::Read(
+      json_payload,
+      base::JSON_PARSE_CHROMIUM_EXTENSIONS | base::JSON_ALLOW_TRAILING_COMMAS);
   if (!json_value) {
     std::move(callback).Run(
         mojom::ProviderError::kInvalidParams,
@@ -238,7 +241,7 @@ void BraveWalletProviderImpl::ContinueAddAndApproveTransaction(
   }
 
   tx_service_->AddUnapprovedTransaction(
-      std::move(tx_data), from,
+      mojom::TxDataUnion::NewEthTxData(std::move(tx_data)), from,
       base::BindOnce(
           &BraveWalletProviderImpl::OnAddUnapprovedTransactionAdapter,
           weak_factory_.GetWeakPtr(), std::move(callback)));
@@ -319,8 +322,8 @@ void BraveWalletProviderImpl::ContinueAddAndApprove1559TransactionWithAccounts(
     return;
   }
 
-  tx_service_->AddUnapproved1559Transaction(
-      std::move(tx_data), from,
+  tx_service_->AddUnapprovedTransaction(
+      mojom::TxDataUnion::NewEthTxData1559(std::move(tx_data)), from,
       base::BindOnce(
           &BraveWalletProviderImpl::OnAddUnapprovedTransactionAdapter,
           weak_factory_.GetWeakPtr(), std::move(callback)));
@@ -364,11 +367,11 @@ void BraveWalletProviderImpl::SignMessage(const std::string& address,
   // Convert to checksum address
   auto checksum_address = EthAddress::FromHex(address);
   GetAllowedAccounts(
-      false,
-      base::BindOnce(&BraveWalletProviderImpl::ContinueSignMessage,
-                     weak_factory_.GetWeakPtr(),
-                     checksum_address.ToChecksumAddress(), message_str,
-                     std::move(message_bytes), std::move(callback), false));
+      false, base::BindOnce(&BraveWalletProviderImpl::ContinueSignMessage,
+                            weak_factory_.GetWeakPtr(),
+                            checksum_address.ToChecksumAddress(), message_str,
+                            std::move(message_bytes), absl::nullopt,
+                            absl::nullopt, false, std::move(callback)));
 }
 
 void BraveWalletProviderImpl::RecoverAddress(const std::string& message,
@@ -413,19 +416,17 @@ void BraveWalletProviderImpl::RecoverAddress(const std::string& message,
 void BraveWalletProviderImpl::SignTypedMessage(
     const std::string& address,
     const std::string& message,
-    const std::string& message_to_sign,
+    const std::vector<uint8_t>& domain_hash,
+    const std::vector<uint8_t>& primary_hash,
     base::Value domain,
     SignTypedMessageCallback callback) {
-  std::vector<uint8_t> eip712_hash;
-  if (!EthAddress::IsValidAddress(address) ||
-      !base::HexStringToBytes(message_to_sign, &eip712_hash) ||
-      eip712_hash.size() != 32 || !domain.is_dict()) {
+  if (!EthAddress::IsValidAddress(address) || !domain.is_dict() ||
+      domain_hash.empty() || primary_hash.empty()) {
     std::move(callback).Run(
         "", mojom::ProviderError::kInvalidParams,
         l10n_util::GetStringUTF8(IDS_WALLET_INVALID_PARAMETERS));
     return;
   }
-
   auto chain_id = domain.FindDoubleKey("chainId");
   if (chain_id) {
     const std::string chain_id_hex =
@@ -440,21 +441,40 @@ void BraveWalletProviderImpl::SignTypedMessage(
     }
   }
 
+  if (domain_hash.empty() || primary_hash.empty()) {
+    std::move(callback).Run(
+        "", mojom::ProviderError::kInvalidParams,
+        l10n_util::GetStringUTF8(IDS_WALLET_INVALID_PARAMETERS));
+    return;
+  }
+  auto message_to_sign = EthSignTypedDataHelper::GetTypedDataMessageToSign(
+      domain_hash, primary_hash);
+  if (!message_to_sign || message_to_sign->size() != 32) {
+    std::move(callback).Run(
+        "", mojom::ProviderError::kInvalidParams,
+        l10n_util::GetStringUTF8(IDS_WALLET_INVALID_PARAMETERS));
+    return;
+  }
+
   // Convert to checksum address
   auto checksum_address = EthAddress::FromHex(address);
   GetAllowedAccounts(
-      false, base::BindOnce(&BraveWalletProviderImpl::ContinueSignMessage,
-                            weak_factory_.GetWeakPtr(),
-                            checksum_address.ToChecksumAddress(), message,
-                            std::move(eip712_hash), std::move(callback), true));
+      false,
+      base::BindOnce(&BraveWalletProviderImpl::ContinueSignMessage,
+                     weak_factory_.GetWeakPtr(),
+                     checksum_address.ToChecksumAddress(), message,
+                     std::move(*message_to_sign), base::HexEncode(domain_hash),
+                     base::HexEncode(primary_hash), true, std::move(callback)));
 }
 
 void BraveWalletProviderImpl::ContinueSignMessage(
     const std::string& address,
     const std::string& message,
     std::vector<uint8_t>&& message_to_sign,
-    SignMessageCallback callback,
+    const absl::optional<std::string>& domain_hash,
+    const absl::optional<std::string>& primary_hash,
     bool is_eip712,
+    SignMessageCallback callback,
     const std::vector<std::string>& allowed_accounts,
     mojom::ProviderError error,
     const std::string& error_message) {
@@ -472,7 +492,9 @@ void BraveWalletProviderImpl::ContinueSignMessage(
   }
 
   auto request =
-      mojom::SignMessageRequest::New(sign_message_id_++, address, message);
+      mojom::SignMessageRequest::New(sign_message_id_++, address, message,
+                                     is_eip712, domain_hash, primary_hash);
+
   if (keyring_service_->IsHardwareAccount(address)) {
     brave_wallet_service_->AddSignMessageRequest(
         std::move(request),
@@ -668,7 +690,6 @@ void BraveWalletProviderImpl::ChainChangedEvent(const std::string& chain_id) {
 }
 
 void BraveWalletProviderImpl::OnConnectionError() {
-  tx_service_.reset();
   rpc_observer_receiver_.reset();
   tx_observer_receiver_.reset();
   keyring_observer_receiver_.reset();

@@ -5,12 +5,10 @@
 
 #include <memory>
 
-#include "base/feature_list.h"
 #include "base/scoped_observation.h"
 #include "base/test/scoped_feature_list.h"
 #include "brave/browser/ui/sidebar/sidebar_model.h"
 #include "brave/browser/ui/sidebar/sidebar_service_factory.h"
-#include "brave/components/sidebar/features.h"
 #include "brave/components/sidebar/sidebar_service.h"
 #include "chrome/test/base/testing_profile.h"
 #include "components/prefs/pref_service.h"
@@ -27,7 +25,6 @@ class SidebarModelTest : public testing::Test, public SidebarModel::Observer {
   ~SidebarModelTest() override = default;
 
   void SetUp() override {
-    scoped_feature_list_.InitAndEnableFeature(kSidebarFeature);
     profile_ = std::make_unique<TestingProfile>();
     service_ = SidebarServiceFactory::GetForProfile(profile_.get());
     model_.reset(new SidebarModel(profile_.get()));
@@ -59,7 +56,6 @@ class SidebarModelTest : public testing::Test, public SidebarModel::Observer {
   std::unique_ptr<SidebarModel> model_;
   base::ScopedObservation<SidebarModel, SidebarModel::Observer> observation_{
       this};
-  base::test::ScopedFeatureList scoped_feature_list_;
 };
 
 TEST_F(SidebarModelTest, ItemsChangedTest) {
@@ -68,6 +64,14 @@ TEST_F(SidebarModelTest, ItemsChangedTest) {
   EXPECT_EQ(service()->items().size(), model()->data_.size());
 
   EXPECT_EQ(-1, model()->active_index());
+
+  // Add one more item to test with 4 items.
+  SidebarItem new_item;
+  new_item.url = GURL("https://brave.com");
+  service()->AddItem(new_item);
+  EXPECT_EQ(4UL, service()->items().size());
+  EXPECT_EQ(4UL, model()->data_.size());
+  EXPECT_EQ(service()->items().size(), model()->data_.size());
 
   // Move item at 1 to at index 2.
   // Total size and active index is not changed when currently active index is

@@ -34,7 +34,7 @@ import org.chromium.ui.resources.ResourceManager;
 import java.util.List;
 
 public class BraveTopToolbarCoordinator extends TopToolbarCoordinator {
-    private TabSwitcherModeTTCoordinatorPhone mTabSwitcherModeCoordinatorPhone;
+    private TabSwitcherModeTTCoordinator mTabSwitcherModeCoordinator;
     private OptionalBrowsingModeButtonController mOptionalButtonController;
     private ToolbarLayout mBraveToolbarLayout;
     private MenuButtonCoordinator mBraveMenuButtonCoordinator;
@@ -62,7 +62,7 @@ public class BraveTopToolbarCoordinator extends TopToolbarCoordinator {
             boolean isTabToGtsAnimationEnabled, boolean isStartSurfaceEnabled,
             boolean isTabGroupsAndroidContinuationEnabled, HistoryDelegate historyDelegate,
             BooleanSupplier partnerHomepageEnabledSupplier, OfflineDownloader offlineDownloader,
-            boolean initializeWithIncognitoColors, boolean shouldHideToolbarLayoutOnStart) {
+            boolean initializeWithIncognitoColors) {
         super(controlContainer, toolbarLayout, toolbarDataProvider, tabController,
                 userEducationHelper, buttonDataProviders, layoutStateProviderSupplier,
                 normalThemeColorProvider, overviewThemeColorProvider,
@@ -74,15 +74,14 @@ public class BraveTopToolbarCoordinator extends TopToolbarCoordinator {
                 isIncognitoModeEnabledSupplier, isGridTabSwitcherEnabled,
                 isTabToGtsAnimationEnabled, isStartSurfaceEnabled,
                 isTabGroupsAndroidContinuationEnabled, historyDelegate,
-                partnerHomepageEnabledSupplier, offlineDownloader, initializeWithIncognitoColors,
-                shouldHideToolbarLayoutOnStart);
+                partnerHomepageEnabledSupplier, offlineDownloader, initializeWithIncognitoColors);
 
         mBraveToolbarLayout = toolbarLayout;
         mBraveMenuButtonCoordinator = browsingModeMenuButtonCoordinator;
 
         if (isToolbarPhone()) {
             if (!isStartSurfaceEnabled) {
-                mTabSwitcherModeCoordinatorPhone = new BraveTabSwitcherModeTTCoordinatorPhone(
+                mTabSwitcherModeCoordinator = new BraveTabSwitcherModeTTCoordinator(
                         controlContainer.getRootView().findViewById(R.id.tab_switcher_toolbar_stub),
                         overviewModeMenuButtonCoordinator, isGridTabSwitcherEnabled,
                         isTabToGtsAnimationEnabled, isIncognitoModeEnabledSupplier);
@@ -96,8 +95,8 @@ public class BraveTopToolbarCoordinator extends TopToolbarCoordinator {
             ((BraveToolbarLayoutImpl) mBraveToolbarLayout)
                     .onBottomToolbarVisibilityChanged(isVisible);
         }
-        if (mTabSwitcherModeCoordinatorPhone instanceof BraveTabSwitcherModeTTCoordinatorPhone) {
-            ((BraveTabSwitcherModeTTCoordinatorPhone) mTabSwitcherModeCoordinatorPhone)
+        if (mTabSwitcherModeCoordinator instanceof BraveTabSwitcherModeTTCoordinator) {
+            ((BraveTabSwitcherModeTTCoordinator) mTabSwitcherModeCoordinator)
                     .onBottomToolbarVisibilityChanged(isVisible);
         }
         mOptionalButtonController.updateButtonVisibility();

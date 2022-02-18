@@ -25,6 +25,7 @@ namespace brave_wallet {
 
 bool IsNativeWalletEnabled();
 bool IsFilecoinEnabled();
+bool IsSolanaEnabled();
 
 // Generate mnemonic from random entropy following BIP39.
 // |entropy_size| should be specify in bytes
@@ -52,11 +53,6 @@ bool DecodeString(size_t offset, const std::string& input, std::string* output);
 bool DecodeStringArray(const std::string& input,
                        std::vector<std::string>* output);
 
-// When we call memset in end of function to clean local variables
-// for security reason, compiler optimizer can remove such call.
-// So we use our own function for this purpose.
-void SecureZeroData(void* data, size_t size);
-
 // Updates preferences for when the wallet is unlocked.
 // This is done in a utils function instead of in the KeyringService
 // because we call it both from the old extension and the new wallet when
@@ -72,6 +68,7 @@ void GetAllKnownChains(PrefService* prefs,
 const std::vector<mojom::EthereumChain> GetAllKnownNetworksForTesting();
 void GetAllCustomChains(PrefService* prefs,
                         std::vector<mojom::EthereumChainPtr>* result);
+GURL GetFirstValidChainURL(const std::vector<std::string>& chain_urls);
 void GetAllChains(PrefService* prefs,
                   std::vector<mojom::EthereumChainPtr>* result);
 GURL GetNetworkURL(PrefService* prefs, const std::string& chain_id);
@@ -105,6 +102,13 @@ mojom::EthereumChainPtr GetChain(PrefService* prefs,
 
 // Get the current chain ID from kBraveWalletCurrentChainId pref.
 std::string GetCurrentChainId(PrefService* prefs);
+
+// Returns the first URL to use that:
+// 1. Has no variables in it like ${INFURA_API_KEY}
+// 2. Is HTTP or HTTPS
+// Otherwise if there is a URL in the list, it returns the first one.
+// Otherwise returns an empty GURL
+GURL GetFirstValidChainURL(const std::vector<std::string>& chain_urls);
 
 }  // namespace brave_wallet
 

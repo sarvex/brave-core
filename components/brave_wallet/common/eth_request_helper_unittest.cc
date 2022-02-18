@@ -340,6 +340,20 @@ TEST(EthResponseHelperUnitTest, ParsePersonalSignParams) {
           "0x9b2055d370f73ec7d8a03e965129118dc8f5bf83"
         ]
       })");
+  const std::string wrong_order(
+      R"({
+        "params": [
+          "0x9b2055d370f73ec7d8a03e965129118dc8f5bf83",
+          "0xdeadbeef"
+        ]
+      })");
+  const std::string two_address_looking_params(
+      R"({
+        "params": [
+          "0x9b2055d370f73ec7d8a03e965129118dc8f5bf84",
+          "0x9b2055d370f73ec7d8a03e965129118dc8f5bf83"
+        ]
+      })");
 
   std::string address;
   std::string message;
@@ -370,6 +384,18 @@ TEST(EthResponseHelperUnitTest, ParsePersonalSignParams) {
   // To be consistent with MM :S
   EXPECT_EQ(ToHex("0x"), "0x3078");
   EXPECT_EQ(message, "0x3078");
+
+  // MM allows the wrong order and figures out the correct order if the first
+  // order is an address by mistake.
+  EXPECT_TRUE(ParsePersonalSignParams(wrong_order, &address, &message));
+  EXPECT_EQ(address, "0x9b2055d370f73ec7d8a03e965129118dc8f5bf83");
+  EXPECT_EQ(message, "0xdeadbeef");
+
+  // Make sure that 2 arguments of the same length doesn't re-order
+  EXPECT_TRUE(
+      ParsePersonalSignParams(two_address_looking_params, &address, &message));
+  EXPECT_EQ(address, "0x9b2055d370f73ec7d8a03e965129118dc8f5bf83");
+  EXPECT_EQ(message, "0x9b2055d370f73ec7d8a03e965129118dc8f5bf84");
 
   EXPECT_FALSE(ParsePersonalSignParams(json, &address, nullptr));
   EXPECT_FALSE(ParsePersonalSignParams(json, nullptr, &message));
@@ -638,11 +664,12 @@ TEST(EthRequestHelperUnitTest, ParseEthSignTypedDataParams) {
   std::string address;
   std::string message;
   base::Value domain;
-  std::vector<uint8_t> message_to_sign;
+  std::vector<uint8_t> domain_hash;
+  std::vector<uint8_t> primary_hash;
 
-  EXPECT_TRUE(ParseEthSignTypedDataParams(
-      json, &address, &message, &message_to_sign, &domain,
-      EthSignTypedDataHelper::Version::kV4));
+  EXPECT_TRUE(ParseEthSignTypedDataParams(json, &address, &message, &domain,
+                                          EthSignTypedDataHelper::Version::kV4,
+                                          &domain_hash, &primary_hash));
 
   EXPECT_EQ(address, "0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826");
   EXPECT_EQ(
@@ -667,7 +694,14 @@ TEST(EthRequestHelperUnitTest, ParseEthSignTypedDataParams) {
   EXPECT_EQ(*ds_verifying_contract,
             "0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC");
 
-  EXPECT_EQ(base::ToLowerASCII(base::HexEncode(message_to_sign)),
+  EXPECT_EQ(base::ToLowerASCII(base::HexEncode(domain_hash)),
+            "f2cee375fa42b42143804025fc449deafd50cc031ca257e0b194a650a912090f");
+  EXPECT_EQ(base::ToLowerASCII(base::HexEncode(primary_hash)),
+            "c52c0ee5d84264471806290a3f2c4cecfc5490626bf912d01f240d7a274b371e");
+  auto message_to_sign = EthSignTypedDataHelper::GetTypedDataMessageToSign(
+      domain_hash, primary_hash);
+  ASSERT_TRUE(message_to_sign);
+  EXPECT_EQ(base::ToLowerASCII(base::HexEncode(*message_to_sign)),
             "be609aee343fb3c4b28e1df9e632fca64fcfaede20f02e86244efddf30957bd2");
 }
 

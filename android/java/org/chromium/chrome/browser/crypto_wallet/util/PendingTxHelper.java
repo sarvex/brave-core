@@ -6,10 +6,11 @@
 package org.chromium.chrome.browser.crypto_wallet.util;
 
 import org.chromium.brave_wallet.mojom.AccountInfo;
-import org.chromium.brave_wallet.mojom.EthTxService;
+import org.chromium.brave_wallet.mojom.CoinType;
 import org.chromium.brave_wallet.mojom.TransactionInfo;
 import org.chromium.brave_wallet.mojom.TransactionStatus;
 import org.chromium.brave_wallet.mojom.TransactionType;
+import org.chromium.brave_wallet.mojom.TxService;
 import org.chromium.chrome.browser.crypto_wallet.util.AsyncUtils;
 
 import java.util.ArrayList;
@@ -20,17 +21,17 @@ import java.util.HashMap;
 import java.util.Locale;
 
 public class PendingTxHelper {
-    private EthTxService mEthTxService;
+    private TxService mTxService;
     private AccountInfo[] mAccountInfos;
     private HashMap<String, TransactionInfo[]> mTxInfos;
     private boolean mReturnAll;
     private String mFilterByContractAddress;
     private String mRopstenContractAddress;
 
-    public PendingTxHelper(EthTxService ethTxService, AccountInfo[] accountInfos, boolean returnAll,
+    public PendingTxHelper(TxService txService, AccountInfo[] accountInfos, boolean returnAll,
             String filterByContractAddress) {
-        assert ethTxService != null;
-        mEthTxService = ethTxService;
+        assert txService != null;
+        mTxService = txService;
         mAccountInfos = accountInfos;
         mFilterByContractAddress = filterByContractAddress;
         mReturnAll = returnAll;
@@ -56,7 +57,7 @@ public class PendingTxHelper {
 
             allTxContexts.add(allTxContext);
 
-            mEthTxService.getAllTransactionInfo(accountInfo.address, allTxContext);
+            mTxService.getAllTransactionInfo(CoinType.ETH, accountInfo.address, allTxContext);
         }
 
         allTxMultiResponse.setWhenAllCompletedAction(() -> {
@@ -69,15 +70,17 @@ public class PendingTxHelper {
                             newValue.add(txInfo);
                         } else if (!mFilterByContractAddress.isEmpty()) {
                             if (mFilterByContractAddress.toLowerCase(Locale.getDefault())
-                                            .equals(txInfo.txData.baseData.to.toLowerCase(
-                                                    Locale.getDefault()))) {
+                                            .equals(txInfo.txDataUnion.getEthTxData1559()
+                                                            .baseData.to.toLowerCase(
+                                                                    Locale.getDefault()))) {
                                 newValue.add(txInfo);
                             }
                             if (mRopstenContractAddress != null
                                     && !mRopstenContractAddress.isEmpty()
                                     && mRopstenContractAddress.toLowerCase(Locale.getDefault())
-                                               .equals(txInfo.txData.baseData.to.toLowerCase(
-                                                       Locale.getDefault()))) {
+                                               .equals(txInfo.txDataUnion.getEthTxData1559()
+                                                               .baseData.to.toLowerCase(
+                                                                       Locale.getDefault()))) {
                                 newValue.add(txInfo);
                             }
 

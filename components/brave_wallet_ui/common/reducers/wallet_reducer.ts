@@ -31,12 +31,15 @@ import {
 } from '../constants/action_types'
 import { mojoTimeDeltaToJSDate } from '../../utils/datetime-utils'
 import * as WalletActions from '../actions/wallet_actions'
-import { formatFiatBalance } from '../../utils/format-balances'
+
+// Utils
 import { sortTransactionByDate } from '../../utils/tx-utils'
-import { normalizeNumericValue } from '../../utils/bn-utils'
+import Amount from '../../utils/amount'
 
 const defaultState: WalletState = {
   hasInitialized: false,
+  isFilecoinEnabled: false,
+  isSolanaEnabled: false,
   isWalletCreated: false,
   isWalletLocked: true,
   favoriteApps: [],
@@ -96,7 +99,8 @@ reducer.on(WalletActions.initialized, (state: any, payload: WalletInfo) => {
       balance: '',
       accountType: getAccountType(info),
       deviceId: info.hardware ? info.hardware.deviceId : '',
-      tokenBalanceRegistry: {}
+      tokenBalanceRegistry: {},
+      coin: info.coin
     } as WalletAccountType
   })
   const selectedAccount = payload.selectedAccount
@@ -106,6 +110,8 @@ reducer.on(WalletActions.initialized, (state: any, payload: WalletInfo) => {
     ...state,
     hasInitialized: true,
     isWalletCreated: payload.isWalletCreated,
+    isFilecoinEnabled: payload.isFilecoinEnabled,
+    isSolanaEnabled: payload.isSolanaEnabled,
     isWalletLocked: payload.isWalletLocked,
     favoriteApps: payload.favoriteApps,
     accounts,
@@ -170,13 +176,13 @@ reducer.on(WalletActions.nativeAssetBalancesUpdated, (state: WalletState, payloa
 
   accounts.forEach((account, index) => {
     if (payload.balances[index].error === BraveWallet.ProviderError.kSuccess) {
-      accounts[index].balance = normalizeNumericValue(payload.balances[index].balance)
+      accounts[index].balance = Amount.normalize(payload.balances[index].balance)
     }
   })
 
   // Refresh selectedAccount object
   const selectedAccount = accounts.find(
-      account => account === state.selectedAccount
+    account => account === state.selectedAccount
   ) ?? state.selectedAccount
 
   return {
@@ -187,18 +193,15 @@ reducer.on(WalletActions.nativeAssetBalancesUpdated, (state: WalletState, payloa
 })
 
 reducer.on(WalletActions.tokenBalancesUpdated, (state: WalletState, payload: GetBlockchainTokenBalanceReturnInfo) => {
-  const userVisibleTokensInfo = state.userVisibleTokensInfo
+  const visibleTokens = state.userVisibleTokensInfo
+    .filter(asset => asset.contractAddress !== '')
 
   let accounts: WalletAccountType[] = [...state.accounts]
   accounts.forEach((account, accountIndex) => {
     payload.balances[accountIndex].forEach((info, tokenIndex) => {
-      const contractAddress = userVisibleTokensInfo[tokenIndex].contractAddress.toLowerCase()
-      if (contractAddress === '') {
-        accounts[accountIndex].balance = normalizeNumericValue(account.balance)
-      } else if (info.error === BraveWallet.ProviderError.kSuccess && userVisibleTokensInfo[tokenIndex].isErc721) {
-        accounts[accountIndex].tokenBalanceRegistry[contractAddress] = normalizeNumericValue(info.balance)
-      } else if (info.error === BraveWallet.ProviderError.kSuccess) {
-        accounts[accountIndex].tokenBalanceRegistry[contractAddress] = normalizeNumericValue(info.balance)
+      if (info.error === BraveWallet.ProviderError.kSuccess) {
+        const contractAddress = visibleTokens[tokenIndex].contractAddress.toLowerCase()
+        accounts[accountIndex].tokenBalanceRegistry[contractAddress] = Amount.normalize(info.balance)
       }
     })
   })
@@ -225,11 +228,14 @@ reducer.on(WalletActions.pricesUpdated, (state: WalletState, payload: GetPriceRe
 reducer.on(WalletActions.portfolioPriceHistoryUpdated, (state: any, payload: PortfolioTokenHistoryAndInfo[][]) => {
   const history = payload.map((infoArray) => {
     return infoArray.map((info) => {
-      if (Number(info.balance) !== 0 && info.token.visible) {
+      if (new Amount(info.balance).isPositive() && info.token.visible) {
         return info.history.values.map((value) => {
           return {
             date: value.date,
-            price: Number(formatFiatBalance(info.balance, info.token.decimals, value.price))
+            price: new Amount(info.balance)
+              .divideByDecimals(info.token.decimals)
+              .times(value.price)
+              .toNumber()
           }
         })
       } else {

@@ -3,6 +3,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this file,
 // you can obtain one at http://mozilla.org/MPL/2.0/.
 import { assert } from 'chrome://resources/js/assert.m.js'
+import { CoinType } from '@glif/filecoin-address'
 import {
   HardwareWalletConnectOpts
 } from '../../components/desktop/popup-modals/add-account-modal/hardware-wallet-connect/types'
@@ -19,7 +20,7 @@ import * as WalletActions from '../actions/wallet_actions'
 // Utils
 import { GetNetworkInfo } from '../../utils/network-utils'
 import { GetTokenParam, GetFlattenedAccountBalances } from '../../utils/api-utils'
-import { normalizeNumericValue } from '../../utils/bn-utils'
+import Amount from '../../utils/amount'
 
 import getAPIProxy from './bridge'
 import { Dispatch, State } from './types'
@@ -27,6 +28,7 @@ import { getHardwareKeyring } from '../api/hardware_keyrings'
 import { GetAccountsHardwareOperationResult } from '../hardware/types'
 import LedgerBridgeKeyring from '../hardware/ledgerjs/eth_ledger_bridge_keyring'
 import TrezorBridgeKeyring from '../hardware/trezor/trezor_bridge_keyring'
+import FilecoinLedgerKeyring from '../hardware/ledgerjs/filecoin_ledger_keyring'
 
 export const getERC20Allowance = (
   contractAddress: string,
@@ -51,9 +53,18 @@ export const getERC20Allowance = (
 
 export const onConnectHardwareWallet = (opts: HardwareWalletConnectOpts): Promise<BraveWallet.HardwareWalletAccount[]> => {
   return new Promise(async (resolve, reject) => {
-    const keyring = getHardwareKeyring(opts.hardware)
+    const keyring = getHardwareKeyring(opts.hardware, opts.coin)
     if (keyring instanceof LedgerBridgeKeyring || keyring instanceof TrezorBridgeKeyring) {
       keyring.getAccounts(opts.startIndex, opts.stopIndex, opts.scheme)
+        .then((result: GetAccountsHardwareOperationResult) => {
+          if (result.payload) {
+            return resolve(result.payload)
+          }
+          reject(result.error)
+        })
+        .catch(reject)
+    } else if (keyring instanceof FilecoinLedgerKeyring) {
+      keyring.getAccounts(opts.startIndex, opts.stopIndex, CoinType.TEST)
         .then((result: GetAccountsHardwareOperationResult) => {
           if (result.payload) {
             return resolve(result.payload)
@@ -70,7 +81,7 @@ export const getBalance = (address: string): Promise<string> => {
     const { jsonRpcService } = getAPIProxy()
     const result = await jsonRpcService.getBalance(address, BraveWallet.CoinType.ETH)
     if (result.error === BraveWallet.ProviderError.kSuccess) {
-      resolve(normalizeNumericValue(result.balance))
+      resolve(Amount.normalize(result.balance))
     } else {
       reject()
     }
@@ -171,16 +182,17 @@ export function refreshBalances (currentNetwork: BraveWallet.EthereumChain) {
       coingeckoId: ''
     }
 
-    const visibleTokens: BraveWallet.BlockchainToken[] = visibleTokensInfo.tokens.length === 0 ? [nativeAsset] : visibleTokensInfo.tokens
-    await dispatch(WalletActions.setVisibleTokensInfo(visibleTokens))
-
     const getBalanceReturnInfos = await Promise.all(accounts.map(async (account) => {
-      const balanceInfo = await jsonRpcService.getBalance(account.address, BraveWallet.CoinType.ETH)
+      const balanceInfo = await jsonRpcService.getBalance(account.address, account.coin)
       return balanceInfo
     }))
     await dispatch(WalletActions.nativeAssetBalancesUpdated({
       balances: getBalanceReturnInfos
     }))
+
+    const visibleAssets: BraveWallet.BlockchainToken[] = visibleTokensInfo.tokens.length === 0 ? [nativeAsset] : visibleTokensInfo.tokens
+    await dispatch(WalletActions.setVisibleTokensInfo(visibleAssets))
+    const visibleTokens = visibleAssets.filter(asset => asset.contractAddress !== '')
 
     const getBlockchainTokenBalanceReturnInfos = await Promise.all(accounts.map(async (account) => {
       return Promise.all(visibleTokens.map(async (token) => {
@@ -287,7 +299,7 @@ export function refreshTokenPriceHistory (selectedPortfolioTimeline: BraveWallet
 export function refreshTransactionHistory (address?: string) {
   return async (dispatch: Dispatch, getState: () => State) => {
     const apiProxy = getAPIProxy()
-    const { ethTxService } = apiProxy
+    const { txService } = apiProxy
 
     const { wallet: { accounts, transactions } } = getState()
 
@@ -297,7 +309,7 @@ export function refreshTransactionHistory (address?: string) {
 
     const freshTransactions: AccountTransactions = await accountsToUpdate.reduce(
       async (acc, account) => acc.then(async (obj) => {
-        const { transactionInfos } = await ethTxService.getAllTransactionInfo(account.address)
+        const { transactionInfos } = await txService.getAllTransactionInfo(BraveWallet.CoinType.ETH, account.address)
         obj[account.address] = transactionInfos
         return obj
       }), Promise.resolve({}))

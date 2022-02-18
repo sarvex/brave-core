@@ -34,13 +34,15 @@ import org.chromium.brave_wallet.mojom.BlockchainRegistry;
 import org.chromium.brave_wallet.mojom.BlockchainToken;
 import org.chromium.brave_wallet.mojom.BraveWalletConstants;
 import org.chromium.brave_wallet.mojom.BraveWalletService;
-import org.chromium.brave_wallet.mojom.EthTxService;
+import org.chromium.brave_wallet.mojom.CoinType;
 import org.chromium.brave_wallet.mojom.EthereumChain;
 import org.chromium.brave_wallet.mojom.JsonRpcService;
+import org.chromium.brave_wallet.mojom.ProviderError;
 import org.chromium.brave_wallet.mojom.TransactionInfo;
 import org.chromium.brave_wallet.mojom.TransactionType;
 import org.chromium.brave_wallet.mojom.TxData;
 import org.chromium.brave_wallet.mojom.TxData1559;
+import org.chromium.brave_wallet.mojom.TxService;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.crypto_wallet.activities.AccountDetailActivity;
 import org.chromium.chrome.browser.crypto_wallet.activities.AssetDetailActivity;
@@ -105,16 +107,16 @@ public class ApproveTxBottomSheetDialogFragment extends BottomSheetDialogFragmen
         return null;
     }
 
-    private EthTxService getEthTxService() {
+    private TxService getTxService() {
         Activity activity = getActivity();
         if (activity instanceof BuySendSwapActivity) {
-            return ((BuySendSwapActivity) activity).getEthTxService();
+            return ((BuySendSwapActivity) activity).getTxService();
         } else if (activity instanceof BraveWalletActivity) {
-            return ((BraveWalletActivity) activity).getEthTxService();
+            return ((BraveWalletActivity) activity).getTxService();
         } else if (activity instanceof AccountDetailActivity) {
-            return ((AccountDetailActivity) activity).getEthTxService();
+            return ((AccountDetailActivity) activity).getTxService();
         } else if (activity instanceof AssetDetailActivity) {
-            return ((AssetDetailActivity) activity).getEthTxService();
+            return ((AssetDetailActivity) activity).getTxService();
         }
 
         return null;
@@ -243,15 +245,17 @@ public class ApproveTxBottomSheetDialogFragment extends BottomSheetDialogFragmen
                                         decimals = mChainDecimals;
                                     }
                                     if (token.contractAddress.toLowerCase(Locale.getDefault())
-                                                    .equals(mTxInfo.txData.baseData.to.toLowerCase(
-                                                            Locale.getDefault()))) {
+                                                    .equals(mTxInfo.txDataUnion.getEthTxData1559()
+                                                                    .baseData.to.toLowerCase(
+                                                                            Locale.getDefault()))) {
                                         fillAssetDependentControls(symbol, view, decimals);
                                         break;
                                     }
                                 }
                             });
                 } else {
-                    if (mTxInfo.txData.baseData.to.toLowerCase(Locale.getDefault())
+                    if (mTxInfo.txDataUnion.getEthTxData1559()
+                                    .baseData.to.toLowerCase(Locale.getDefault())
                                     .equals(Utils.SWAP_EXCHANGE_PROXY.toLowerCase(
                                             Locale.getDefault()))) {
                         txType.setText(getResources().getString(R.string.swap));
@@ -281,8 +285,8 @@ public class ApproveTxBottomSheetDialogFragment extends BottomSheetDialogFragmen
     }
 
     private void fillAssetDependentControls(String asset, View view, int decimals) {
-        String valueToConvert = mTxInfo.txData.baseData.value;
-        String to = mTxInfo.txData.baseData.to;
+        String valueToConvert = mTxInfo.txDataUnion.getEthTxData1559().baseData.value;
+        String to = mTxInfo.txDataUnion.getEthTxData1559().baseData.to;
         if (mTxInfo.txType == TransactionType.ERC20_TRANSFER && mTxInfo.txArgs.length > 1) {
             valueToConvert = mTxInfo.txArgs[1];
             to = mTxInfo.txArgs[0];
@@ -306,7 +310,7 @@ public class ApproveTxBottomSheetDialogFragment extends BottomSheetDialogFragmen
                     if (values.length != 0) {
                         valueFiat = values[0].price;
                     }
-                    String valueAsset = mTxInfo.txData.baseData.value;
+                    String valueAsset = mTxInfo.txDataUnion.getEthTxData1559().baseData.value;
                     if (mTxInfo.txType == TransactionType.ERC20_TRANSFER
                             && mTxInfo.txArgs.length > 1) {
                         valueAsset = mTxInfo.txArgs[1];
@@ -330,11 +334,11 @@ public class ApproveTxBottomSheetDialogFragment extends BottomSheetDialogFragmen
     }
 
     private void rejectTransaction(boolean dismiss) {
-        EthTxService ethTxService = getEthTxService();
-        if (ethTxService == null) {
+        TxService txService = getTxService();
+        if (txService == null) {
             return;
         }
-        ethTxService.rejectTransaction(mTxInfo.id, success -> {
+        txService.rejectTransaction(CoinType.ETH, mTxInfo.id, success -> {
             assert success;
             if (!success || !dismiss) {
                 return;
@@ -345,12 +349,14 @@ public class ApproveTxBottomSheetDialogFragment extends BottomSheetDialogFragmen
     }
 
     private void approveTransaction() {
-        EthTxService ethTxService = getEthTxService();
-        if (ethTxService == null) {
+        TxService txService = getTxService();
+        if (txService == null) {
             return;
         }
-        ethTxService.approveTransaction(mTxInfo.id, success -> {
+        txService.approveTransaction(CoinType.ETH, mTxInfo.id, (success, error, errorMessage) -> {
             assert success;
+            Utils.warnWhenError(ApproveTxBottomSheetDialogFragment.TAG_FRAGMENT,
+                    "approveTransaction", error, errorMessage);
             if (!success) {
                 return;
             }

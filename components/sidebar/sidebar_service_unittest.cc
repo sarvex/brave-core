@@ -6,10 +6,7 @@
 #include <memory>
 #include <utility>
 
-#include "base/feature_list.h"
-#include "base/test/scoped_feature_list.h"
 #include "brave/components/sidebar/constants.h"
-#include "brave/components/sidebar/features.h"
 #include "brave/components/sidebar/pref_names.h"
 #include "brave/components/sidebar/sidebar_service.h"
 #include "components/prefs/scoped_user_pref_update.h"
@@ -26,10 +23,6 @@ class SidebarServiceTest : public testing::Test,
   ~SidebarServiceTest() override = default;
 
   void SetUp() override {
-    // Disable by default till we implement all sidebar features.
-    EXPECT_FALSE(base::FeatureList::IsEnabled(kSidebarFeature));
-
-    scoped_feature_list_.InitAndEnableFeature(kSidebarFeature);
     SidebarService::RegisterProfilePrefs(prefs_.registry());
   }
 
@@ -78,14 +71,13 @@ class SidebarServiceTest : public testing::Test,
 
   TestingPrefServiceSimple prefs_;
   std::unique_ptr<SidebarService> service_;
-  base::test::ScopedFeatureList scoped_feature_list_;
 };
 
 TEST_F(SidebarServiceTest, AddRemoveItems) {
   InitService();
 
   // Check the default items count.
-  EXPECT_EQ(4UL, service_->items().size());
+  EXPECT_EQ(3UL, service_->items().size());
   EXPECT_EQ(0UL, service_->GetNotAddedDefaultSidebarItems().size());
 
   // Cache 1st item to compare after removing.
@@ -97,7 +89,7 @@ TEST_F(SidebarServiceTest, AddRemoveItems) {
   EXPECT_EQ(-1, item_index_on_called_);
 
   service_->RemoveItemAt(0);
-  EXPECT_EQ(3UL, service_->items().size());
+  EXPECT_EQ(2UL, service_->items().size());
   EXPECT_EQ(1UL, service_->GetNotAddedDefaultSidebarItems().size());
   EXPECT_EQ(0, item_index_on_called_);
   EXPECT_TRUE(on_will_remove_item_called_);
@@ -108,8 +100,8 @@ TEST_F(SidebarServiceTest, AddRemoveItems) {
   EXPECT_FALSE(on_item_added_called_);
   service_->AddItem(item);
   // New item will be added at last.
-  EXPECT_EQ(3, item_index_on_called_);
-  EXPECT_EQ(4UL, service_->items().size());
+  EXPECT_EQ(2, item_index_on_called_);
+  EXPECT_EQ(3UL, service_->items().size());
   EXPECT_EQ(0UL, service_->GetNotAddedDefaultSidebarItems().size());
   EXPECT_TRUE(on_item_added_called_);
   ClearState();
@@ -119,15 +111,19 @@ TEST_F(SidebarServiceTest, AddRemoveItems) {
       SidebarItem::Type::kTypeWeb, SidebarItem::BuiltInItemType::kNone, true);
   EXPECT_TRUE(IsWebType(item2));
   service_->AddItem(item2);
-  EXPECT_EQ(4, item_index_on_called_);
-  EXPECT_EQ(5UL, service_->items().size());
+  EXPECT_EQ(3, item_index_on_called_);
+  EXPECT_EQ(4UL, service_->items().size());
   // Default item count is not changed.
-  EXPECT_EQ(4UL, service_->GetDefaultSidebarItemsFromCurrentItems().size());
+  EXPECT_EQ(3UL, service_->GetDefaultSidebarItemsFromCurrentItems().size());
 }
 
 TEST_F(SidebarServiceTest, MoveItem) {
   InitService();
 
+  // Add one more item to test with 4 items.
+  SidebarItem new_item;
+  new_item.url = GURL("https://brave.com");
+  service_->AddItem(new_item);
   EXPECT_EQ(4UL, service_->items().size());
 
   // Move item at 0 to index 2.
@@ -188,6 +184,37 @@ TEST_F(SidebarServiceTest, BuiltInItemUpdateTestWithBuiltInItemTypeKey) {
   EXPECT_EQ("https://talk.brave.com/widget", service_->items()[0].url);
 }
 
+TEST_F(SidebarServiceTest, BuiltInItemDoesntHaveHistoryItem) {
+  // Make prefs already have builtin items before service initialization.
+  // And it has history item.
+  {
+    ListPrefUpdate update(&prefs_, sidebar::kSidebarItems);
+    update->ClearList();
+
+    base::Value dict(base::Value::Type::DICTIONARY);
+    dict.SetStringKey(sidebar::kSidebarItemURLKey,
+                      "https://deprecated.brave.com/");
+    dict.SetIntKey(sidebar::kSidebarItemTypeKey,
+                   static_cast<int>(SidebarItem::Type::kTypeBuiltIn));
+    dict.SetIntKey(sidebar::kSidebarItemBuiltInItemTypeKey,
+                   static_cast<int>(SidebarItem::BuiltInItemType::kHistory));
+    dict.SetBoolKey(sidebar::kSidebarItemOpenInPanelKey, true);
+    update->Append(std::move(dict));
+  }
+
+  InitService();
+
+  // Check service doesn't have history item.
+  EXPECT_EQ(0UL, service_->items().size());
+
+  // Make sure history is not included in the not added default items list.
+  auto not_added_default_items = service_->GetNotAddedDefaultSidebarItems();
+  EXPECT_EQ(3UL, not_added_default_items.size());
+  for (const auto& item : not_added_default_items) {
+    EXPECT_NE(SidebarItem::BuiltInItemType::kHistory, item.built_in_item_type);
+  }
+}
+
 TEST_F(SidebarServiceTest, BuiltInItemUpdateTestWithoutBuiltInItemTypeKey) {
   // Prepare built-in item in prefs w/o setting BuiltInItemType.
   // If not stored, service uses url to get proper latest properties.
@@ -211,6 +238,24 @@ TEST_F(SidebarServiceTest, BuiltInItemUpdateTestWithoutBuiltInItemTypeKey) {
   EXPECT_EQ(1UL, service_->items().size());
   EXPECT_EQ(SidebarItem::BuiltInItemType::kBraveTalk,
             service_->items()[0].built_in_item_type);
+}
+
+TEST_F(SidebarServiceTest, SidebarShowOptionsDeprecationTest) {
+  // Show on click is deprecated.
+  // Treat it as a show on mouse over.
+  prefs_.SetInteger(
+      kSidebarShowOption,
+      static_cast<int>(SidebarService::ShowSidebarOption::kShowOnClick));
+
+  InitService();
+  EXPECT_EQ(SidebarService::ShowSidebarOption::kShowOnMouseOver,
+            service_->GetSidebarShowOption());
+}
+
+TEST_F(SidebarServiceTest, SidebarShowOptionsDefaultTest) {
+  InitService();
+  EXPECT_EQ(SidebarService::ShowSidebarOption::kShowAlways,
+            service_->GetSidebarShowOption());
 }
 
 }  // namespace sidebar

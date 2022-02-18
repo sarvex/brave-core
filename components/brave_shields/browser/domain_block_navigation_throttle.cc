@@ -13,13 +13,11 @@
 #include "base/metrics/histogram_macros.h"
 #include "base/task/post_task.h"
 #include "base/threading/thread_task_runner_handle.h"
-#include "brave/components/brave_shields/browser/ad_block_custom_filters_service.h"
 #include "brave/components/brave_shields/browser/ad_block_service.h"
 #include "brave/components/brave_shields/browser/domain_block_controller_client.h"
 #include "brave/components/brave_shields/browser/domain_block_page.h"
 #include "brave/components/brave_shields/browser/domain_block_tab_storage.h"
 #include "brave/components/brave_shields/common/features.h"
-#include "brave/components/ephemeral_storage/ephemeral_storage_service.h"
 #include "components/content_settings/core/browser/host_content_settings_map.h"
 #include "components/prefs/pref_service.h"
 #include "components/security_interstitials/content/security_interstitial_tab_helper.h"
@@ -40,7 +38,7 @@ bool ShouldBlockDomainOnTaskRunner(
   bool did_match_exception = false;
   bool did_match_rule = false;
   bool did_match_important = false;
-  std::string adblock_replacement_url;
+  std::string mock_data_url;
   // force aggressive blocking to `true` for domain blocking - these requests
   // are all "first-party", but the throttle is already only called when
   // necessary.
@@ -48,7 +46,7 @@ bool ShouldBlockDomainOnTaskRunner(
   ad_block_service->ShouldStartRequest(
       url, blink::mojom::ResourceType::kMainFrame, url.host(),
       aggressive_blocking, &did_match_rule, &did_match_exception,
-      &did_match_important, &adblock_replacement_url);
+      &did_match_important, &mock_data_url);
   return (did_match_important || (did_match_rule && !did_match_exception));
 }
 
@@ -61,11 +59,11 @@ std::unique_ptr<DomainBlockNavigationThrottle>
 DomainBlockNavigationThrottle::MaybeCreateThrottleFor(
     content::NavigationHandle* navigation_handle,
     AdBlockService* ad_block_service,
-    AdBlockCustomFiltersService* ad_block_custom_filters_service,
+    AdBlockCustomFiltersProvider* ad_block_custom_filters_provider,
     ephemeral_storage::EphemeralStorageService* ephemeral_storage_service,
     HostContentSettingsMap* content_settings,
     const std::string& locale) {
-  if (!ad_block_service || !ad_block_custom_filters_service)
+  if (!ad_block_service || !ad_block_custom_filters_provider)
     return nullptr;
   if (!base::FeatureList::IsEnabled(brave_shields::features::kBraveDomainBlock))
     return nullptr;
@@ -73,20 +71,20 @@ DomainBlockNavigationThrottle::MaybeCreateThrottleFor(
   if (!navigation_handle->IsInMainFrame())
     return nullptr;
   return std::make_unique<DomainBlockNavigationThrottle>(
-      navigation_handle, ad_block_service, ad_block_custom_filters_service,
+      navigation_handle, ad_block_service, ad_block_custom_filters_provider,
       ephemeral_storage_service, content_settings, locale);
 }
 
 DomainBlockNavigationThrottle::DomainBlockNavigationThrottle(
     content::NavigationHandle* navigation_handle,
     AdBlockService* ad_block_service,
-    AdBlockCustomFiltersService* ad_block_custom_filters_service,
+    AdBlockCustomFiltersProvider* ad_block_custom_filters_provider,
     ephemeral_storage::EphemeralStorageService* ephemeral_storage_service,
     HostContentSettingsMap* content_settings,
     const std::string& locale)
     : content::NavigationThrottle(navigation_handle),
       ad_block_service_(ad_block_service),
-      ad_block_custom_filters_service_(ad_block_custom_filters_service),
+      ad_block_custom_filters_provider_(ad_block_custom_filters_provider),
       ephemeral_storage_service_(ephemeral_storage_service),
       content_settings_(content_settings),
       locale_(locale) {
@@ -101,22 +99,24 @@ content::NavigationThrottle::ThrottleCheckResult
 DomainBlockNavigationThrottle::WillStartRequest() {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
 
-  if (!ad_block_service_->IsInitialized())
-    return content::NavigationThrottle::PROCEED;
-
   content::NavigationHandle* handle = navigation_handle();
   DCHECK(handle->IsInMainFrame());
   GURL request_url = handle->GetURL();
 
   domain_blocking_type_ =
       brave_shields::GetDomainBlockingType(content_settings_, request_url);
+  content::WebContents* web_contents = handle->GetWebContents();
   // Maybe don't block based on Brave Shields settings
-  if (domain_blocking_type_ == DomainBlockingType::kNone)
+  if (domain_blocking_type_ == DomainBlockingType::kNone) {
+    DomainBlockTabStorage* tab_storage =
+        DomainBlockTabStorage::FromWebContents(web_contents);
+    if (tab_storage)
+      tab_storage->DropBlockedDomain1PESLifetime();
     return content::NavigationThrottle::PROCEED;
+  }
 
   // If user has just chosen to proceed on our interstitial, don't show
   // another one.
-  content::WebContents* web_contents = handle->GetWebContents();
   DomainBlockTabStorage* tab_storage =
       DomainBlockTabStorage::GetOrCreate(web_contents);
   if (tab_storage->IsProceeding())
@@ -156,6 +156,10 @@ DomainBlockNavigationThrottle::WillProcessResponse() {
 void DomainBlockNavigationThrottle::OnShouldBlockDomain(
     bool should_block_domain) {
   if (!should_block_domain) {
+    DomainBlockTabStorage* tab_storage = DomainBlockTabStorage::FromWebContents(
+        navigation_handle()->GetWebContents());
+    if (tab_storage)
+      tab_storage->DropBlockedDomain1PESLifetime();
     // Navigation was deferred while we called the ad block service on a task
     // runner, but now we know that we want to allow navigation to continue.
     Resume();
@@ -187,7 +191,7 @@ void DomainBlockNavigationThrottle::ShowInterstitial() {
   // The controller client implements the actual logic to "go back" or "proceed"
   // from the interstitial.
   auto controller_client = std::make_unique<DomainBlockControllerClient>(
-      web_contents, request_url, ad_block_custom_filters_service_,
+      web_contents, request_url, ad_block_custom_filters_provider_,
       ephemeral_storage_service_, pref_service, locale_);
 
   // This handles populating the HTML template of the interstitial page with
@@ -215,10 +219,14 @@ void DomainBlockNavigationThrottle::ShowInterstitial() {
 
 void DomainBlockNavigationThrottle::Enable1PESAndResume() {
   DCHECK(ephemeral_storage_service_);
-  ephemeral_storage_service_->Enable1PESForUrlIfPossible(
-      navigation_handle()->GetURL(),
-      base::BindOnce(&DomainBlockNavigationThrottle::Resume,
-                     weak_ptr_factory_.GetWeakPtr()));
+  DomainBlockTabStorage* tab_storage = DomainBlockTabStorage::FromWebContents(
+      navigation_handle()->GetWebContents());
+  if (tab_storage) {
+    tab_storage->Enable1PESForUrlIfPossible(
+        ephemeral_storage_service_, navigation_handle()->GetURL(),
+        base::BindOnce(&DomainBlockNavigationThrottle::Resume,
+                       weak_ptr_factory_.GetWeakPtr()));
+  }
 }
 
 const char* DomainBlockNavigationThrottle::GetNameForLogging() {

@@ -42,6 +42,11 @@
     <color name="onboarding_indicator_selected_color">#FF7654</color>
     <color name="onboarding_indicator_default_color">#C2C4CF</color>
 
+    <!-- Set Default Browser colors -->
+    <color name="set_default_bottom_sheet_bg_color">@android:color/white</color>
+    <color name="set_default_text_color">#212529</color>
+    <color name="set_default_bottom_sheet_button_disable_color">#DADCE8</color>
+
     <!-- Sync colors -->
     <color name="brave_sync_bg_color">@color/modern_grey_50</color>
     <color name="brave_sync_border_color">@color/modern_grey_50</color>
@@ -51,6 +56,7 @@
 
     <!-- Theme colors -->
     <color name="brave_theme_color">#fb542b</color>
+    <color name="brave_tab_view_card_selected_bg">@color/baseline_primary_200</color>
 
     <!-- Brave news colors -->
     <!-- <color name="card_background">#DC353535</color> -->
@@ -68,10 +74,7 @@
     <!-- Incognito background and branding colors -->
     <color name="incognito_modern_primary_color">#210950</color>
 
-    <color name="toolbar_background_primary_incognito">#1B0C32</color>
     <color name="toolbar_text_box_background_incognito">#3D2742</color>
-
-    <color name="tab_back_incognito">@color/toolbar_background_primary_incognito</color>
 
     <color name="compositor_tab_title_bar_text_incognito">@android:color/white</color>
 

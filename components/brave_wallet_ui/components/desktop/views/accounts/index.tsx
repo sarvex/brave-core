@@ -65,12 +65,12 @@ export interface Props {
   transactionSpotPrices: BraveWallet.AssetPrice[]
   selectedAccount: WalletAccountType | undefined
   defaultCurrencies: DefaultCurrencies
-  onViewPrivateKey: (address: string, isDefault: boolean) => void
+  onViewPrivateKey: (address: string, isDefault: boolean, coin: BraveWallet.CoinType) => void
   onDoneViewingPrivateKey: () => void
   toggleNav: () => void
   onClickAddAccount: (tabId: AddAccountNavTypes) => () => void
   onUpdateAccountName: (payload: UpdateAccountNamePayloadType) => { success: boolean }
-  onRemoveAccount: (address: string, hardware: boolean) => void
+  onRemoveAccount: (address: string, hardware: boolean, coin: BraveWallet.CoinType) => void
   onSelectAccount: (account: WalletAccountType) => void
   onSelectAsset: (token: BraveWallet.BlockchainToken) => void
   goBack: () => void

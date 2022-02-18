@@ -2,6 +2,7 @@ import * as React from 'react'
 import * as qr from 'qr-image'
 import {
   AccountSettingsNavTypes,
+  BraveWallet,
   WalletAccountType,
   UpdateAccountNamePayloadType,
   TopTabNavObjectType
@@ -41,8 +42,8 @@ export interface Props {
   onUpdateAccountName: (payload: UpdateAccountNamePayloadType) => { success: boolean }
   onCopyToClipboard: () => void
   onChangeTab: (id: AccountSettingsNavTypes) => void
-  onRemoveAccount: (address: string, hardware: boolean) => void
-  onViewPrivateKey: (address: string, isDefault: boolean) => void
+  onRemoveAccount: (address: string, hardware: boolean, coin: BraveWallet.CoinType) => void
+  onViewPrivateKey: (address: string, isDefault: boolean, coin: BraveWallet.CoinType) => void
   onDoneViewingPrivateKey: () => void
   onToggleNav: () => void
   privateKey: string
@@ -107,7 +108,7 @@ const AddAccountModal = (props: Props) => {
   }
 
   const removeAccount = () => {
-    onRemoveAccount(account.address, false)
+    onRemoveAccount(account.address, false, account.coin)
     onToggleNav()
     onClose()
   }
@@ -115,7 +116,7 @@ const AddAccountModal = (props: Props) => {
   const onShowPrivateKey = () => {
     if (onViewPrivateKey) {
       const isDefault = account?.accountType === 'Primary'
-      onViewPrivateKey(account?.address ?? '', isDefault)
+      onViewPrivateKey(account?.address ?? '', isDefault, account?.coin)
     }
     setShowPrivateKey(true)
   }

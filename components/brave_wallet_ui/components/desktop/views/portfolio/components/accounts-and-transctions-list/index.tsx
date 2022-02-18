@@ -10,15 +10,14 @@ import {
 
 // Utils
 import { getLocale } from '../../../../../../../common/locale'
-import {
-  formatFiatAmountWithCommasAndDecimals
-} from '../../../../../../utils/format-prices'
+import Amount from '../../../../../../utils/amount'
 
 // Components
 import {
   PortfolioTransactionItem,
   PortfolioAccountItem,
-  AddButton
+  AddButton,
+  WithHideBalancePlaceholder
 } from '../../../../'
 
 // Hooks
@@ -42,10 +41,11 @@ export interface Props {
   selectedAsset: BraveWallet.BlockchainToken | undefined
   accounts: WalletAccountType[]
   selectedNetwork: BraveWallet.EthereumChain
-  fullAssetFiatBalance: string
+  fullAssetFiatBalance: Amount
   formattedFullAssetBalance: string
   selectedAssetTransactions: BraveWallet.TransactionInfo[]
   userVisibleTokensInfo: BraveWallet.BlockchainToken[]
+  hideBalances: boolean
   onSelectAccount: (account: WalletAccountType) => void
   onClickAddAccount: (tabId: AddAccountNavTypes) => () => void
   onSelectAsset: (asset: BraveWallet.BlockchainToken | undefined) => () => void
@@ -65,6 +65,7 @@ const AccountsAndTransactionsList = (props: Props) => {
     formattedFullAssetBalance,
     selectedAssetTransactions,
     userVisibleTokensInfo,
+    hideBalances,
     onSelectAccount,
     onClickAddAccount,
     onSelectAsset,
@@ -93,7 +94,14 @@ const AccountsAndTransactionsList = (props: Props) => {
           <DividerRow>
             <DividerText>{selectedAsset?.isErc721 ? getLocale('braveWalletOwner') : getLocale('braveWalletAccounts')}</DividerText>
             {!selectedAsset?.isErc721 &&
-              <AssetBalanceDisplay>{formatFiatAmountWithCommasAndDecimals(fullAssetFiatBalance, defaultCurrencies.fiat)} {formattedFullAssetBalance}</AssetBalanceDisplay>
+              <WithHideBalancePlaceholder
+                size='small'
+                hideBalances={hideBalances}
+              >
+                <AssetBalanceDisplay>
+                  {fullAssetFiatBalance.formatAsFiat(defaultCurrencies.fiat)} {formattedFullAssetBalance}
+                </AssetBalanceDisplay>
+              </WithHideBalancePlaceholder>
             }
           </DividerRow>
           <SubDivider />
@@ -108,6 +116,7 @@ const AccountsAndTransactionsList = (props: Props) => {
               address={account.address}
               assetBalance={getBalance(account, selectedAsset)}
               selectedNetwork={selectedNetwork}
+              hideBalances={hideBalances}
             />
           )}
           <ButtonRow>

@@ -9,7 +9,9 @@
 #include "base/rand_util.h"
 #include "bat/ads/ad_type.h"
 #include "bat/ads/inline_content_ad_info.h"
+#include "bat/ads/internal/ad_serving/ad_serving_features.h"
 #include "bat/ads/internal/ad_serving/ad_targeting/geographic/subdivision/subdivision_targeting.h"
+#include "bat/ads/internal/ad_serving/inline_content_ads/inline_content_ads_features.h"
 #include "bat/ads/internal/ad_targeting/ad_targeting_user_model_builder.h"
 #include "bat/ads/internal/ad_targeting/ad_targeting_user_model_info.h"
 #include "bat/ads/internal/ads/inline_content_ads/inline_content_ad_builder.h"
@@ -17,10 +19,8 @@
 #include "bat/ads/internal/bundle/creative_inline_content_ad_info.h"
 #include "bat/ads/internal/eligible_ads/inline_content_ads/eligible_inline_content_ads_base.h"
 #include "bat/ads/internal/eligible_ads/inline_content_ads/eligible_inline_content_ads_factory.h"
-#include "bat/ads/internal/features/ad_serving/ad_serving_features.h"
-#include "bat/ads/internal/features/inline_content_ads/inline_content_ads_features.h"
 #include "bat/ads/internal/logging.h"
-#include "bat/ads/internal/resources/frequency_capping/anti_targeting_resource.h"
+#include "bat/ads/internal/resources/frequency_capping/anti_targeting/anti_targeting_resource.h"
 
 namespace ads {
 namespace inline_content_ads {
@@ -70,7 +70,8 @@ void AdServing::MaybeServeAd(const std::string& dimensions,
     return;
   }
 
-  const ad_targeting::UserModelInfo user_model = ad_targeting::BuildUserModel();
+  const ad_targeting::UserModelInfo& user_model =
+      ad_targeting::BuildUserModel();
 
   DCHECK(eligible_ads_);
   eligible_ads_->GetForUserModel(
@@ -86,9 +87,9 @@ void AdServing::MaybeServeAd(const std::string& dimensions,
         BLOG(1, "Found " << creative_ads.size() << " eligible ads");
 
         const int rand = base::RandInt(0, creative_ads.size() - 1);
-        const CreativeInlineContentAdInfo creative_ad = creative_ads.at(rand);
+        const CreativeInlineContentAdInfo& creative_ad = creative_ads.at(rand);
 
-        const InlineContentAdInfo ad = BuildInlineContentAd(creative_ad);
+        const InlineContentAdInfo& ad = BuildInlineContentAd(creative_ad);
         if (!ServeAd(ad, callback)) {
           BLOG(1, "Failed to serve inline content ad");
           FailedToServeAd(dimensions, callback);

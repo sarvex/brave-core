@@ -111,7 +111,8 @@ interface BraveWalletProvider {
   // message is for displaying the sign request to users
   // message_to_sign is the hex representation without 0x for eip712 hash
   // domain is the domain separator defined in eip712
-  SignTypedMessage(string address, string message, string message_to_sign,
+  SignTypedMessage(string address, string message,
+                   array<uint8> domain_hash, array<uint8> primary_hash,
                    mojo_base.mojom.DictionaryValue domain)
     => (string signature, ProviderError error, string error_message);
 
@@ -148,7 +149,8 @@ interface PanelHandlerFactory {
                      pending_receiver<AssetRatioService> asset_ratio_service,
                      pending_receiver<KeyringService> keyring_service,
                      pending_receiver<BlockchainRegistry> blockchain_registry,
-                     pending_receiver<EthTxService> eth_tx_service,
+                     pending_receiver<TxService> tx_service,
+                     pending_receiver<EthTxManagerProxy> eth_tx_manager_proxy,
                      pending_receiver<BraveWalletService> brave_wallet_service);
 };
 
@@ -162,7 +164,8 @@ interface PageHandlerFactory {
                     pending_receiver<AssetRatioService> asset_ratio_service,
                     pending_receiver<KeyringService> keyring_service,
                     pending_receiver<BlockchainRegistry> blockchain_registry,
-                    pending_receiver<EthTxService> eth_tx_service,
+                    pending_receiver<TxService> tx_service,
+                    pending_receiver<EthTxManagerProxy> eth_tx_manager_proxy,
                     pending_receiver<BraveWalletService> brave_wallet_service);
 
 };
@@ -253,6 +256,7 @@ const string kFilecoinTestnet = "t";
 const string kFilecoinMainnet = "f";
 
 const string kFilecoinKeyringId = "filecoin";
+const string kSolanaKeyringId = "solana";
 const string kDefaultKeyringId = "default";
 
 enum FilecoinAddressProtocol {
@@ -285,7 +289,7 @@ struct AccountInfo {
 
 struct KeyringInfo {
   string id;
-  bool is_default_keyring_created;
+  bool is_keyring_created;
   bool is_locked;
   bool is_backed_up;
   array<AccountInfo> account_infos;
@@ -297,7 +301,9 @@ interface WalletHandler {
   GetWalletInfo() => (bool isWalletCreated, bool isWalletLocked,
                       array<AppItem> favoriteApps,
                       bool isWalletBackedUp,
-                      array<AccountInfo> accountInfos);
+                      array<AccountInfo> accountInfos,
+                      bool isFilecoinEnabled,
+                      bool isSolanaEnabled);
 
   // Adds a favorite app to the apps list
   AddFavoriteApp(AppItem appItem);
@@ -325,10 +331,10 @@ interface Page {
 
 interface KeyringServiceObserver {
   // Fired when a keyring is created
-  KeyringCreated();
+  KeyringCreated(string keyring_id);
 
   // Fired when a keyring is restored
-  KeyringRestored();
+  KeyringRestored(string keyring_id);
 
   // Fired when a keyring is reset
   KeyringReset();
@@ -377,6 +383,8 @@ interface KeyringService {
   CreateWallet(string password) => (string mnemonic);
 
   // Obtains the mnemonic code words for an already existing wallet
+  // TODO(darkdh): make result optional instead of using empty string indicated
+  // failure
   GetMnemonicForDefaultKeyring() => (string mnemonic);
 
   // Restores a wallet with the specified mnemonic and encrypts it with the
@@ -395,20 +403,21 @@ interface KeyringService {
   IsLocked() => (bool isLocked);
 
   // Adds an account to the keyring.
-  AddAccount(string accountName) => (bool success);
+  AddAccount(string accountName, CoinType coin ) => (bool success);
 
   // Obtains the private key for the keyring.
-  GetPrivateKeyForDefaultKeyringAccount(string address)
+  GetPrivateKeyForKeyringAccount(string address, CoinType coin)
     => (bool success, string privateKey);
 
-  // Imports an account with a specific private key to the keyring
-  ImportAccount(string accountName, string privateKey)
+  // Imports an account with a specific private key to the corresponding keyring
+  // privateKey can be coin preferred encoding, ex. hex or base58
+  ImportAccount(string accountName, string privateKey, CoinType coin)
     => (bool success, string address);
 
   ImportFilecoinSECP256K1Account(string accountName, string privateKey, string network)
     => (bool success, string address);
 
-  ImportFilecoinBLSAccount(string accountName, string privateKey, string publicKey, string network)
+  ImportFilecoinBLSAccount(string accountName, string privateKey, string network)
     => (bool success, string address);
 
   // Imports an account via JSON
@@ -416,11 +425,11 @@ interface KeyringService {
     => (bool success, string address);
 
   // Obtains the private key for an imported account
-  GetPrivateKeyForImportedAccount(string address)
+  GetPrivateKeyForImportedAccount(string address, CoinType coin)
     => (bool success, string privateKey);
 
   // Removes an imported account
-  RemoveImportedAccount(string address) => (bool success);
+  RemoveImportedAccount(string address, CoinType coin) => (bool success);
 
   // Determines if the keyring has been backed up
   IsWalletBackedUp() => (bool backed_up);
@@ -500,7 +509,6 @@ interface AssetRatioService {
   // Gas estimation APIs
   GetEstimatedTime(string gas_price /* decimal string in wei */) =>
       (bool success, string seconds);
-  GetGasOracle() => (GasEstimation1559? estimation);
 
   // Obtain token info via contract address through etherscan API.
   GetTokenInfo(string contract_address) => (BlockchainToken? token);
@@ -683,11 +691,26 @@ enum TransactionType {
   Other
 };
 
+// TODO(jocelyn): Fill the struct with needed fields.
+struct SolanaTxData {
+};
+
+// TODO(spylogsster): Fill the struct with needed fields.
+struct FilTxData {
+};
+
+union TxDataUnion {
+  TxData eth_tx_data;
+  TxData1559 eth_tx_data_1559;
+  SolanaTxData solana_tx_data;
+  FilTxData fil_tx_data;
+};
+
 struct TransactionInfo {
   string id;
   string from_address;
   string tx_hash;
-  TxData1559 tx_data;
+  TxDataUnion tx_data_union;
   TransactionStatus tx_status;
   TransactionType tx_type;
   array<string> tx_params;
@@ -697,7 +720,7 @@ struct TransactionInfo {
   mojo_base.mojom.TimeDelta confirmed_time;
 };
 
-interface EthTxServiceObserver {
+interface TxServiceObserver {
   // Fired when a new unapproved transaction is encountered
   OnNewUnapprovedTx(TransactionInfo tx_info);
 
@@ -711,19 +734,37 @@ interface EthTxServiceObserver {
 
 // For transaction management such as creation, broadcasting, and storing
 // transactions.
-interface EthTxService {
+interface TxService {
   // Used to add a transaction
-  AddUnapprovedTransaction(TxData tx_data, string from) => (bool success, string tx_meta_id, string error_message);
-
-  // Used to add an EIP 1559 transaction
-  AddUnapproved1559Transaction(TxData1559 tx_data, string from) => (bool success, string tx_meta_id, string error_message);
+  AddUnapprovedTransaction(TxDataUnion tx_data_union, string from) => (bool success, string tx_meta_id, string error_message);
 
   // Used to approve a transaction
-  ApproveTransaction(string tx_meta_id) => (bool status);
+  ApproveTransaction(CoinType coin_type, string tx_meta_id) => (bool status, ProviderError error, string error_message);
 
   // Used to reject a transaction
-  RejectTransaction(string tx_meta_id) => (bool status);
+  RejectTransaction(CoinType coin_type, string tx_meta_id) => (bool status);
 
+  // Obtains a list of all transactions from an address.
+  // This returns different data depending on which network is currently selected in JsonRpcService
+  GetAllTransactionInfo(CoinType coin_type, string from) => (array<TransactionInfo> transaction_infos);
+
+  // Used to speed-up or cancel a transaction
+  SpeedupOrCancelTransaction(CoinType coin_type, string tx_meta_id, bool cancel) => (bool success, string tx_meta_id, string error_message);
+
+  // Used to retry a transaction
+  RetryTransaction(CoinType coin_type, string tx_meta_id) => (bool success, string tx_meta_id, string error_message);
+
+  GetTransactionMessageToSign(CoinType coin_type, string tx_meta_id) => (string? message);
+
+  // Adds an observer for TxService
+  AddObserver(pending_remote<TxServiceObserver> observer);
+
+  // Resets the keyring and the related preferences
+  Reset();
+};
+
+// Transaction related APIs specific to EVM.
+interface EthTxManagerProxy {
   // Used for modifying transaction data
   SetGasPriceAndLimitForUnapprovedTransaction(string tx_meta_id, string gas_price, string gas_limit) => (bool success);
   SetGasFeeAndLimitForUnapprovedTransaction(string tx_meta_id, string max_priority_fee_per_gas, string max_fee_per_gas, string gas_limit) => (bool success);
@@ -735,24 +776,11 @@ interface EthTxService {
   MakeERC20ApproveData(string spender_address, string amount) => (bool success, array<uint8> data);
   MakeERC721TransferFromData(string from, string to, string token_id, string contract_address) => (bool success, array<uint8> data);
 
-  // Obtains a list of all transactions from an address.
-  // This returns different data depending on which network is currently selected in JsonRpcService
-  GetAllTransactionInfo(string from) => (array<TransactionInfo> transaction_infos);
+  // Gas estimation API via eth_feeHistory API
+  GetGasEstimation1559() => (GasEstimation1559? estimation);
 
-  // Adds an observer for EthTxService
-  AddObserver(pending_remote<EthTxServiceObserver> observer);
-
-  // Used to speed-up or cancel a transaction
-  SpeedupOrCancelTransaction(string tx_meta_id, bool cancel) => (bool success, string tx_meta_id, string error_message);
-
-  // Used to retry a transaction
-  RetryTransaction(string tx_meta_id) => (bool success, string tx_meta_id, string error_message);
   GetNonceForHardwareTransaction(string tx_meta_id) => (string? nonce);
-  GetTransactionMessageToSign(string tx_meta_id) => (string? message);
-  ProcessHardwareSignature(string tx_meta_id, string v, string r, string s) => (bool status);
-
-  // Resets the keyring and the related preferences
-  Reset();
+  ProcessHardwareSignature(string tx_meta_id, string v, string r, string s) => (bool status, ProviderError error, string error_message);
 };
 
 interface BraveWalletServiceObserver {
@@ -776,6 +804,11 @@ struct SignMessageRequest {
   int32 id;
   string address;
   string message;
+  bool is_eip712;
+  // These fields are for hardware eip712 signing and
+  // Should be used only if is_eip712 is true
+  string? domain_hash;
+  string? primary_hash;
 };
 
 enum ExternalWalletType {

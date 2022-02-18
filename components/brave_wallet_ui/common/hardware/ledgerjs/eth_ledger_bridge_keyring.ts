@@ -6,7 +6,6 @@
 import { assert } from 'chrome://resources/js/assert.m.js'
 import TransportWebHID from '@ledgerhq/hw-transport-webhid'
 import Eth from '@ledgerhq/hw-app-eth'
-
 import { BraveWallet } from '../../../constants/types'
 import { getLocale } from '../../../../common/locale'
 import { hardwareDeviceIdFromAddress } from '../hardwareDeviceIdFromAddress'
@@ -14,8 +13,8 @@ import {
   GetAccountsHardwareOperationResult,
   SignatureVRS,
   SignHardwareMessageOperationResult,
-  SignHardwareTransactionOperationResult
-, HardwareOperationResult, LedgerDerivationPaths
+  SignHardwareTransactionOperationResult,
+  HardwareOperationResult, LedgerDerivationPaths
 } from '../types'
 import { LedgerEthereumKeyring } from '../interfaces'
 import { HardwareVendor } from '../../api/hardware_keyrings'
@@ -63,7 +62,7 @@ export default class LedgerBridgeKeyring extends LedgerEthereumKeyring {
   }
 
   isUnlocked = (): boolean => {
-    return this.app !== undefined
+    return this.app !== undefined && this.deviceId !== undefined
   }
 
   makeApp = async () => {
@@ -71,21 +70,20 @@ export default class LedgerBridgeKeyring extends LedgerEthereumKeyring {
   }
 
   unlock = async (): Promise<HardwareOperationResult> => {
-    if (this.app) {
+    if (this.isUnlocked()) {
       return { success: true }
     }
 
-    await this.makeApp()
     if (!this.app) {
-      return { success: false }
+      await this.makeApp()
     }
-
-    const eth: Eth = this.app
-    eth.transport.on('disconnect', this.onDisconnected)
-    const zeroPath = this.getPathForIndex(0, LedgerDerivationPaths.LedgerLive)
-    const address = (await eth.getAddress(zeroPath)).address
-    this.deviceId = await hardwareDeviceIdFromAddress(address)
-
+    if (this.app && !this.deviceId) {
+      const eth: Eth = this.app
+      eth.transport.on('disconnect', this.onDisconnected)
+      const zeroPath = this.getPathForIndex(0, LedgerDerivationPaths.LedgerLive)
+      const address = (await eth.getAddress(zeroPath)).address
+      this.deviceId = await hardwareDeviceIdFromAddress(address)
+    }
     return { success: this.isUnlocked() }
   }
 
@@ -98,6 +96,21 @@ export default class LedgerBridgeKeyring extends LedgerEthereumKeyring {
       const eth: Eth = this.app
       const signed = await eth.signTransaction(path, rawTxHex)
       return { success: true, payload: signed }
+    } catch (e) {
+      return { success: false, error: e.message, code: e.statusCode || e.id || e.name }
+    }
+  }
+
+  signEip712Message = async (path: string, domainSeparatorHex: string, hashStructMessageHex: string): Promise<SignHardwareMessageOperationResult> => {
+    try {
+      const unlocked = await this.unlock()
+      if (!unlocked.success || !this.app) {
+        return unlocked
+      }
+      const eth: Eth = this.app
+      const data = await eth.signEIP712HashedMessage(path, domainSeparatorHex, hashStructMessageHex)
+      const signature = this.createMessageSignature(data)
+      return { success: true, payload: signature }
     } catch (e) {
       return { success: false, error: e.message, code: e.statusCode || e.id || e.name }
     }
@@ -134,7 +147,12 @@ export default class LedgerBridgeKeyring extends LedgerEthereumKeyring {
   }
 
   private readonly createMessageSignature = (result: SignatureVRS) => {
-    let v = (result.v - 27).toString()
+    // Convert the recovery identifier to standard ECDSA if using bitcoin secp256k1 convention.
+    let v = result.v < 27
+      ? result.v.toString(16)
+      : (result.v - 27).toString(16)
+
+    // Pad v with a leading zero if value is under `16` (i.e., single character hex).
     if (v.length < 2) {
       v = `0${v}`
     }
@@ -146,7 +164,11 @@ export default class LedgerBridgeKeyring extends LedgerEthereumKeyring {
     if (scheme === LedgerDerivationPaths.LedgerLive) {
       return `m/44'/60'/${index}'/0/0`
     }
+    if (scheme === LedgerDerivationPaths.Deprecated) {
+      return `m/44'/60'/${index}'/0`
+    }
+
     assert(scheme === LedgerDerivationPaths.Legacy)
-    return `m/44'/60'/${index}'/0`
+    return `m/44'/60'/0'/${index}`
   }
 }

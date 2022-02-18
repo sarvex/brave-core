@@ -6,7 +6,7 @@
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
-      android:key="hide_brave_rewards_icon"
+      android:key="show_brave_rewards_icon"
       android:title="@string/show_brave_rewards_icon_title"
       android:summaryOn="@string/text_on"
       android:summaryOff="@string/text_off" />
@@ -20,12 +20,6 @@
     <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
         android:key="brave_night_mode_enabled_key"
         android:title="@string/night_mode_enable"
-        android:summaryOn="@string/text_on"
-        android:summaryOff="@string/text_off" />
-
-    <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
-        android:key="brave_enable_tab_groups"
-        android:title="@string/enable_tab_groups_title"
         android:summaryOn="@string/text_on"
         android:summaryOff="@string/text_off" />
 

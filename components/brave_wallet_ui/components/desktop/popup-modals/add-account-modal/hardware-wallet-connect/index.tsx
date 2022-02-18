@@ -21,22 +21,29 @@ import {
 // Custom types
 import { HardwareWalletConnectOpts, ErrorMessage, HardwareWalletDerivationPathsMapping } from './types'
 import HardwareWalletAccountsList from './accounts-list'
-import { HardwareDerivationScheme, LedgerDerivationPaths } from '../../../../../common/hardware/types'
+import { HardwareDerivationScheme, LedgerDerivationPaths, FilecoinNetwork } from '../../../../../common/hardware/types'
 import { HardwareVendor } from '../../../../../common/api/hardware_keyrings'
 
 export interface Props {
   onConnectHardwareWallet: (opts: HardwareWalletConnectOpts) => Promise<BraveWallet.HardwareWalletAccount[]>
   onAddHardwareAccounts: (selected: BraveWallet.HardwareWalletAccount[]) => void
   getBalance: (address: string) => Promise<string>
+  onChangeFilecoinNetwork: (network: FilecoinNetwork) => void
   preAddedHardwareWalletAccounts: WalletAccountType[]
   selectedAccountType: CreateAccountOptionsType
   selectedNetwork: BraveWallet.EthereumChain
+  filecoinNetwork: FilecoinNetwork
 }
 
 const derivationBatch = 4
 
 export default function (props: Props) {
-  const { selectedAccountType, selectedNetwork } = props
+  const {
+    selectedAccountType,
+    selectedNetwork,
+    filecoinNetwork,
+    onChangeFilecoinNetwork
+  } = props
   const [selectedHardwareWallet, setSelectedHardwareWallet] = React.useState<HardwareVendor>(BraveWallet.LEDGER_HARDWARE_VENDOR)
   const [isConnecting, setIsConnecting] = React.useState<boolean>(false)
   const [accounts, setAccounts] = React.useState<BraveWallet.HardwareWalletAccount[]>([])
@@ -46,9 +53,9 @@ export default function (props: Props) {
     LedgerDerivationPaths.LedgerLive
   )
   const [showAccountsList, setShowAccountsList] = React.useState<boolean>(false)
-  const getErrorMessage = (error: any) => {
+  const getErrorMessage = (error: any, accountTypeName: string) => {
     if (error.statusCode && error.statusCode === 27404) { // Unknown Error
-      return { error: getLocale('braveWalletConnectHardwareInfo2'), userHint: '' }
+      return { error: getLocale('braveWalletConnectHardwareInfo2').replace('$1', accountTypeName), userHint: '' }
     }
 
     if (error.statusCode && (error.statusCode === 27904 || error.statusCode === 26368)) { // INCORRECT_LENGTH or INS_NOT_SUPPORTED
@@ -74,7 +81,7 @@ export default function (props: Props) {
     }).then((result) => {
       setAccounts(result)
     }).catch((error) => {
-      setConnectionError(getErrorMessage(error))
+      setConnectionError(getErrorMessage(error, selectedAccountType.name))
       setShowAccountsList(false)
     }).finally(
       () => setIsConnecting(false)
@@ -143,7 +150,7 @@ export default function (props: Props) {
       setAccounts([...accounts, ...result])
       setShowAccountsList(true)
     }).catch((error) => {
-      setConnectionError(getErrorMessage(error))
+      setConnectionError(getErrorMessage(error, selectedAccountType.name))
       setShowAccountsList(false)
     }).finally(
       () => setIsConnecting(false)
@@ -164,31 +171,37 @@ export default function (props: Props) {
         onAddAccounts={onAddAccounts}
         getBalance={getBalance}
         selectedNetwork={selectedNetwork}
+        filecoinNetwork={filecoinNetwork}
+        onChangeFilecoinNetwork={onChangeFilecoinNetwork}
+        selectedAccountType={selectedAccountType}
       />
     )
   }
 
   return (
     <>
-      <HardwareTitle>{getLocale('braveWalletConnectHardwareTitle')}</HardwareTitle>
-      <HardwareButtonRow>
-        <HardwareButton
-          onClick={onSelectLedger}
-          isSelected={selectedHardwareWallet === BraveWallet.LEDGER_HARDWARE_VENDOR}
-          disabled={isConnecting && selectedHardwareWallet !== BraveWallet.LEDGER_HARDWARE_VENDOR}
-        >
-          <LedgerIcon />
-        </HardwareButton>
-        {(selectedAccountType.coin !== BraveWallet.CoinType.FIL) &&
-        <HardwareButton
-          onClick={onSelectTrezor}
-          isSelected={selectedHardwareWallet === BraveWallet.TREZOR_HARDWARE_VENDOR}
-          disabled={isConnecting && selectedHardwareWallet !== BraveWallet.TREZOR_HARDWARE_VENDOR}
-        >
-          <TrezorIcon />
-        </HardwareButton>
-        }
-      </HardwareButtonRow>
+      {(selectedAccountType.coin !== BraveWallet.CoinType.FIL) &&
+        <>
+          <HardwareTitle>{getLocale('braveWalletConnectHardwareTitle')}</HardwareTitle>
+          <HardwareButtonRow>
+            <HardwareButton
+              onClick={onSelectLedger}
+              isSelected={selectedHardwareWallet === BraveWallet.LEDGER_HARDWARE_VENDOR}
+              disabled={isConnecting && selectedHardwareWallet !== BraveWallet.LEDGER_HARDWARE_VENDOR}
+            >
+              <LedgerIcon />
+            </HardwareButton>
+
+            <HardwareButton
+              onClick={onSelectTrezor}
+              isSelected={selectedHardwareWallet === BraveWallet.TREZOR_HARDWARE_VENDOR}
+              disabled={isConnecting && selectedHardwareWallet !== BraveWallet.TREZOR_HARDWARE_VENDOR}
+            >
+              <TrezorIcon />
+            </HardwareButton>
+          </HardwareButtonRow>
+        </>
+      }
       <HardwareInfoRow>
         <InfoIcon />
         <HardwareInfoColumn>

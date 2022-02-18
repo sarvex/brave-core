@@ -20,6 +20,7 @@
 #include "brave/common/webui_url_constants.h"
 #include "brave/components/brave_vpn/buildflags/buildflags.h"
 #include "brave/components/ipfs/buildflags/buildflags.h"
+#include "brave/components/sidebar/buildflags/buildflags.h"
 #include "brave/components/tor/buildflags/buildflags.h"
 #include "build/build_config.h"
 #include "chrome/browser/profiles/profile.h"
@@ -58,6 +59,11 @@
 
 #if BUILDFLAG(ENABLE_TOR)
 #include "brave/browser/ui/webui/tor_internals_ui.h"
+#endif
+
+#if BUILDFLAG(ENABLE_SIDEBAR)
+#include "brave/browser/ui/webui/sidebar/sidebar_bookmarks_ui.h"
+#include "brave/components/sidebar/constants.h"
 #endif
 
 using content::WebUI;
@@ -128,6 +134,10 @@ WebUIController* NewWebUI(WebUI* web_ui, const GURL& url) {
   } else if (host == kTorInternalsHost) {
     return new TorInternalsUI(web_ui, url.host());
 #endif
+#if BUILDFLAG(ENABLE_SIDEBAR)
+  } else if (host == kSidebarBookmarksHost) {
+    return new SidebarBookmarksUI(web_ui);
+#endif
   }
   return nullptr;
 }
@@ -150,6 +160,9 @@ WebUIFactoryFunction GetWebUIFactoryFunction(WebUI* web_ui,
 #endif  // BUILDFLAG(ENABLE_IPFS)
 #if BUILDFLAG(ENABLE_BRAVE_VPN) && !defined(OS_ANDROID)
       (url.host_piece() == kVPNPanelHost && brave_vpn::IsBraveVPNEnabled()) ||
+#endif
+#if BUILDFLAG(ENABLE_SIDEBAR)
+      url.host_piece() == kSidebarBookmarksHost ||
 #endif
 #if !defined(OS_ANDROID)
       url.host_piece() == kWalletPanelHost ||

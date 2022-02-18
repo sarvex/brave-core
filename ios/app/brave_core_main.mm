@@ -26,9 +26,9 @@
 #include "brave/ios/browser/api/sync/brave_sync_api+private.h"
 #include "brave/ios/browser/api/sync/driver/brave_sync_profile_service+private.h"
 #include "brave/ios/browser/brave_wallet/brave_wallet_service_factory.h"
-#include "brave/ios/browser/brave_wallet/eth_tx_service_factory.h"
 #include "brave/ios/browser/brave_wallet/json_rpc_service_factory.h"
 #include "brave/ios/browser/brave_wallet/keyring_service_factory.h"
+#include "brave/ios/browser/brave_wallet/tx_service_factory.h"
 #include "brave/ios/browser/brave_web_client.h"
 #include "brave/ios/browser/component_updater/component_updater_utils.h"
 #include "components/component_updater/component_updater_switches.h"
@@ -48,6 +48,7 @@
 #include "ios/chrome/browser/ui/webui/chrome_web_ui_ios_controller_factory.h"
 #include "ios/chrome/browser/undo/bookmark_undo_service_factory.h"
 #include "ios/public/provider/chrome/browser/chrome_browser_provider.h"
+#include "ios/public/provider/chrome/browser/ui_utils/ui_utils_api.h"
 #include "ios/web/public/init/web_main.h"
 
 // Chromium logging is global, therefore we cannot link this to the instance in
@@ -135,7 +136,7 @@ const BraveCoreSwitch BraveCoreSwitchSkusEnvironment =
     params.argv = argv;
     _webMain = std::make_unique<web::WebMain>(std::move(params));
 
-    ios::GetChromeBrowserProvider().Initialize();
+    ios::provider::InitializeUI();
 
     web::WebUIIOSControllerFactory::RegisterFactory(
         ChromeWebUIIOSControllerFactory::GetInstance());
@@ -164,7 +165,11 @@ const BraveCoreSwitch BraveCoreSwitchSkusEnvironment =
 }
 
 - (void)onAppWillTerminate:(NSNotification*)notification {
+  [[NSNotificationCenter defaultCenter] removeObserver:self];
+  _mainBrowserState = nullptr;
   _webMain.reset();
+  _delegate.reset();
+  _webClient.reset();
 }
 
 - (void)scheduleLowPriorityStartupTasks {
@@ -280,8 +285,8 @@ static bool CustomLogHandler(int severity,
     return nil;
   }
 
-  auto tx_service =
-      brave_wallet::EthTxServiceFactory::GetForBrowserState(browserState);
+  auto* tx_service =
+      brave_wallet::TxServiceFactory::GetServiceForState(browserState);
   if (!tx_service) {
     return nil;
   }
@@ -300,8 +305,7 @@ static bool CustomLogHandler(int severity,
 
   auto* provider = new brave_wallet::BraveWalletProviderImpl(
       ios::HostContentSettingsMapFactory::GetForBrowserState(browserState),
-      json_rpc_service, std::move(tx_service), keyring_service,
-      brave_wallet_service,
+      json_rpc_service, tx_service, keyring_service, brave_wallet_service,
       std::make_unique<brave_wallet::BraveWalletProviderDelegateBridge>(
           delegate),
       browserState->GetPrefs());

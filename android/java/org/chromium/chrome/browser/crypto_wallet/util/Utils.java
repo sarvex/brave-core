@@ -23,18 +23,23 @@ import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.drawable.BitmapDrawable;
+import android.hardware.biometrics.BiometricManager;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Handler;
 import android.text.SpannableString;
 import android.text.style.ClickableSpan;
+import android.util.Pair;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import androidx.annotation.RequiresApi;
 import androidx.annotation.VisibleForTesting;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.hardware.fingerprint.FingerprintManagerCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -55,7 +60,6 @@ import org.chromium.brave_wallet.mojom.BlockchainRegistry;
 import org.chromium.brave_wallet.mojom.BlockchainToken;
 import org.chromium.brave_wallet.mojom.BraveWalletConstants;
 import org.chromium.brave_wallet.mojom.BraveWalletService;
-import org.chromium.brave_wallet.mojom.EthTxService;
 import org.chromium.brave_wallet.mojom.EthereumChain;
 import org.chromium.brave_wallet.mojom.JsonRpcService;
 import org.chromium.brave_wallet.mojom.ProviderError;
@@ -63,6 +67,7 @@ import org.chromium.brave_wallet.mojom.TransactionInfo;
 import org.chromium.brave_wallet.mojom.TransactionStatus;
 import org.chromium.brave_wallet.mojom.TransactionType;
 import org.chromium.brave_wallet.mojom.TxData;
+import org.chromium.brave_wallet.mojom.TxService;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.crypto_wallet.activities.AssetDetailActivity;
 import org.chromium.chrome.browser.crypto_wallet.activities.BuySendSwapActivity;
@@ -119,6 +124,8 @@ public class Utils {
     public static final String ASSET_DECIMALS = "assetDecimals";
     public static final String CHAIN_ID = "chainId";
     private static final int CLEAR_CLIPBOARD_INTERVAL = 60000; // In milliseconds
+    private static final String ETHEREUM_CONTRACT_FOR_SWAP =
+            "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 
     public static List<String> getRecoveryPhraseAsList(String recoveryPhrase) {
         String[] recoveryPhraseArray = recoveryPhrase.split(" ");
@@ -438,26 +445,33 @@ public class Utils {
         return 0;
     }
 
-    public static String toWei(String number, int decimals) {
-        if (number.isEmpty()) {
-            return "0";
+    public static String toWei(String number, int decimals, boolean calculateOtherAsset) {
+        if (number.isEmpty() || calculateOtherAsset) {
+            return "";
         }
+
         int dotPosition = number.indexOf(".");
-        String multiplier = getDecimalsDepNumber(decimals);
+        String multiplier = Utils.getDecimalsDepNumber(decimals);
         if (dotPosition != -1) {
             int zeroToRemove = number.length() - dotPosition - 1;
-            multiplier = multiplier.substring(0, multiplier.length() - zeroToRemove);
+            if (zeroToRemove < multiplier.length()) {
+                multiplier = multiplier.substring(0, multiplier.length() - zeroToRemove);
+            } else {
+                number = number.substring(
+                        0, number.length() - (zeroToRemove - multiplier.length() + 1));
+                multiplier = "1";
+            }
             number = number.replace(".", "");
         }
         try {
             BigInteger bigNumber = new BigInteger(number, 10);
             BigInteger res = bigNumber.multiply(new BigInteger(multiplier));
 
-            return res.toString();
+            return res.equals(BigInteger.ZERO) ? "" : res.toString();
         } catch (NumberFormatException ex) {
         }
 
-        return "0";
+        return "";
     }
 
     public static double fromWei(String number, int decimals) {
@@ -478,10 +492,16 @@ public class Utils {
             return "0x0";
         }
         int dotPosition = number.indexOf(".");
-        String multiplier = getDecimalsDepNumber(decimals);
+        String multiplier = Utils.getDecimalsDepNumber(decimals);
         if (dotPosition != -1) {
             int zeroToRemove = number.length() - dotPosition - 1;
-            multiplier = multiplier.substring(0, multiplier.length() - zeroToRemove);
+            if (zeroToRemove < multiplier.length()) {
+                multiplier = multiplier.substring(0, multiplier.length() - zeroToRemove);
+            } else {
+                number = number.substring(
+                        0, number.length() - (zeroToRemove - multiplier.length() + 1));
+                multiplier = "1";
+            }
             number = number.replace(".", "");
         }
         BigInteger bigNumber = new BigInteger(number, 10);
@@ -980,7 +1000,7 @@ public class Utils {
     public static void openTransaction(TransactionInfo txInfo, JsonRpcService jsonRpcService,
             AppCompatActivity activity, AccountInfo[] accountInfos) {
         assert txInfo != null;
-        String to = txInfo.txData.baseData.to;
+        String to = txInfo.txDataUnion.getEthTxData1559().baseData.to;
         if (txInfo.txType == TransactionType.ERC20_TRANSFER && txInfo.txArgs.length > 1) {
             to = txInfo.txArgs[0];
         }
@@ -988,7 +1008,7 @@ public class Utils {
     }
 
     public static void setUpTransactionList(AccountInfo[] accountInfos,
-            AssetRatioService assetRatioService, EthTxService ethTxService,
+            AssetRatioService assetRatioService, TxService txService,
             BlockchainRegistry blockchainRegistry, BraveWalletService braveWalletService,
             String assetSymbol, String contractAddress, int assetDecimals,
             RecyclerView rvTransactions, OnWalletListItemClick callback, Context context,
@@ -1022,7 +1042,7 @@ public class Utils {
                                                    Locale.getDefault()))) {
                             try {
                                 fetchTransactions(accountInfos, Double.valueOf(tempPrice),
-                                        Double.valueOf(tempPrice), ethTxService, blockchainRegistry,
+                                        Double.valueOf(tempPrice), txService, blockchainRegistry,
                                         contractAddress, rvTransactions, callback, context,
                                         assetSymbol, assetDecimals, chainId, assetRatioService,
                                         braveWalletService, finalChainSymbol, finalChainDecimals,
@@ -1044,7 +1064,7 @@ public class Utils {
                                     try {
                                         fetchTransactions(accountInfos,
                                                 Double.valueOf(chainSymbolPrice),
-                                                Double.valueOf(tempPriceAsset), ethTxService,
+                                                Double.valueOf(tempPriceAsset), txService,
                                                 blockchainRegistry, contractAddress, rvTransactions,
                                                 callback, context, assetSymbol, assetDecimals,
                                                 chainId, assetRatioService, braveWalletService,
@@ -1058,14 +1078,14 @@ public class Utils {
     }
 
     private static void fetchTransactions(AccountInfo[] accountInfos, double chainSymbolPrice,
-            double assetPrice, EthTxService ethTxService, BlockchainRegistry blockchainRegistry,
+            double assetPrice, TxService txService, BlockchainRegistry blockchainRegistry,
             String contractAddress, RecyclerView rvTransactions, OnWalletListItemClick callback,
             Context context, String assetSymbol, int assetDecimals, String chainId,
             AssetRatioService assetRatioService, BraveWalletService braveWalletService,
             String chainSymbol, int chainDecimals, WalletCoinAdapter walletTxCoinAdapter) {
-        assert ethTxService != null;
+        assert txService != null;
         PendingTxHelper pendingTxHelper =
-                new PendingTxHelper(ethTxService, accountInfos, true, contractAddress);
+                new PendingTxHelper(txService, accountInfos, true, contractAddress);
         pendingTxHelper.fetchTransactions(() -> {
             HashMap<String, TransactionInfo[]> pendingTxInfos = pendingTxHelper.getTransactions();
             if (assetSymbol != null && assetDecimals != 0) {
@@ -1108,8 +1128,9 @@ public class Utils {
                                 decimals = chainDecimals;
                             }
                             if (token.contractAddress.toLowerCase(Locale.getDefault())
-                                            .equals(txInfo.txData.baseData.to.toLowerCase(
-                                                    Locale.getDefault()))) {
+                                            .equals(txInfo.txDataUnion.getEthTxData1559()
+                                                            .baseData.to.toLowerCase(
+                                                                    Locale.getDefault()))) {
                                 assets.put(txInfo.id, symbol);
                                 assetsDecimals.put(symbol, decimals);
                                 break;
@@ -1189,8 +1210,8 @@ public class Utils {
                 assetPrice = assetPriceTemp;
             }
         }
-        String valueAsset = txInfo.txData.baseData.value;
-        String to = txInfo.txData.baseData.to;
+        String valueAsset = txInfo.txDataUnion.getEthTxData1559().baseData.value;
+        String to = txInfo.txDataUnion.getEthTxData1559().baseData.to;
         Date date = new Date(txInfo.createdTime.microseconds / 1000);
         DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault());
         String strDate = dateFormat.format(date);
@@ -1228,7 +1249,8 @@ public class Utils {
                     assetSymbol, "0x Exchange Proxy");
             valueToDisplay = "0.0000 " + assetSymbol;
         }
-        if (txInfo.txData.baseData.to.toLowerCase(Locale.getDefault())
+        if (txInfo.txDataUnion.getEthTxData1559()
+                        .baseData.to.toLowerCase(Locale.getDefault())
                         .equals(Utils.SWAP_EXCHANGE_PROXY.toLowerCase(Locale.getDefault()))) {
             action = String.format(context.getResources().getString(R.string.wallet_tx_info_swap),
                     accountName, strDate);
@@ -1241,14 +1263,16 @@ public class Utils {
         WalletListItemModel itemModel =
                 new WalletListItemModel(R.drawable.ic_eth, action, detailInfo, null, null);
         updateWalletCoinTransactionStatus(itemModel, context, txInfo);
-        boolean isEIP1559 = !txInfo.txData.maxPriorityFeePerGas.isEmpty()
-                && !txInfo.txData.maxFeePerGas.isEmpty();
+        boolean isEIP1559 = !txInfo.txDataUnion.getEthTxData1559().maxPriorityFeePerGas.isEmpty()
+                && !txInfo.txDataUnion.getEthTxData1559().maxFeePerGas.isEmpty();
         double totalGas = isEIP1559
-                ? Utils.fromHexWei(Utils.multiplyHexBN(txInfo.txData.baseData.gasLimit,
-                                           txInfo.txData.maxFeePerGas),
+                ? Utils.fromHexWei(
+                        Utils.multiplyHexBN(txInfo.txDataUnion.getEthTxData1559().baseData.gasLimit,
+                                txInfo.txDataUnion.getEthTxData1559().maxFeePerGas),
                         18)
-                : Utils.fromHexWei(Utils.multiplyHexBN(txInfo.txData.baseData.gasLimit,
-                                           txInfo.txData.baseData.gasPrice),
+                : Utils.fromHexWei(
+                        Utils.multiplyHexBN(txInfo.txDataUnion.getEthTxData1559().baseData.gasLimit,
+                                txInfo.txDataUnion.getEthTxData1559().baseData.gasPrice),
                         18);
         double totalGasFiat = totalGas * chainSymbolPrice;
         itemModel.setChainSymbol(chainSymbol);
@@ -1349,6 +1373,53 @@ public class Utils {
             String tag, String apiName, Integer error, String errorMessage) {
         if (error != ProviderError.SUCCESS) {
             Log.d(tag, apiName + ": " + error + " - " + errorMessage);
+        }
+    }
+
+    public static Pair<Integer, String> getBuySendSwapContractAddress(BlockchainToken token) {
+        int decimals = 18;
+        String address = ETHEREUM_CONTRACT_FOR_SWAP;
+        if (token != null) {
+            decimals = token.decimals;
+            address = token.contractAddress;
+            if (address.isEmpty()) address = ETHEREUM_CONTRACT_FOR_SWAP;
+        }
+
+        return new Pair<Integer, String>(decimals, address);
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.R)
+    private static boolean canAuthenticate(BiometricManager biometricManager) {
+        assert biometricManager != null;
+
+        return biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK)
+                == BiometricManager.BIOMETRIC_SUCCESS;
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.P)
+    public static boolean isBiometricAvailable(Context context) {
+        // Only Android versions 9 and above are supported.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
+            return false;
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            BiometricManager biometricManager = context.getSystemService(BiometricManager.class);
+            if (biometricManager == null) {
+                return false;
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                return Utils.canAuthenticate(biometricManager);
+            }
+
+            return biometricManager.canAuthenticate() == BiometricManager.BIOMETRIC_SUCCESS;
+        } else {
+            // For API level < Q, we will use FingerprintManagerCompat to check enrolled
+            // fingerprints. Note that for API level lower than 23, FingerprintManagerCompat behaves
+            // like no fingerprint hardware and no enrolled fingerprints.
+            FingerprintManagerCompat fingerprintManager = FingerprintManagerCompat.from(context);
+            return fingerprintManager != null && fingerprintManager.isHardwareDetected()
+                    && fingerprintManager.hasEnrolledFingerprints();
         }
     }
 }

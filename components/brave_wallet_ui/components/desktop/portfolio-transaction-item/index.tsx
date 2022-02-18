@@ -11,11 +11,8 @@ import {
 // Utils
 import { toProperCase } from '../../../utils/string-utils'
 import { mojoTimeDeltaToJSDate, formatDateAsRelative } from '../../../utils/datetime-utils'
-import {
-  formatFiatAmountWithCommasAndDecimals,
-  formatTokenAmountWithCommasAndDecimals
-} from '../../../utils/format-prices'
-import { formatBalance } from '../../../utils/format-balances'
+import Amount from '../../../utils/amount'
+import { copyToClipboard } from '../../../utils/copy-to-clipboard'
 
 // Hooks
 import { useExplorer, useTransactionParser } from '../../../common/hooks'
@@ -109,6 +106,10 @@ const PortfolioTransactionItem = (props: Props) => {
 
   const onClickViewOnBlockExplorer = useExplorer(selectedNetwork)
 
+  const onClickCopyTransactionHash = (transactionHash: string) => {
+    copyToClipboard(transactionHash)
+  }
+
   const onClickRetryTransaction = () => {
     onRetryTransaction(transaction)
   }
@@ -170,7 +171,7 @@ const PortfolioTransactionItem = (props: Props) => {
       }
 
       // Detect sending to 0x Exchange Proxy
-      case transaction.txData.baseData.to.toLowerCase() === SwapExchangeProxy: {
+      case transaction.txDataUnion.ethTxData1559?.baseData.to.toLowerCase() === SwapExchangeProxy: {
         const text = getLocale('braveWalletSwap')
         return displayAccountName ? text.toLowerCase() : text
       }
@@ -219,7 +220,7 @@ const PortfolioTransactionItem = (props: Props) => {
       }
 
       // FIXME: Add as new BraveWallet.TransactionType on the service side.
-      case transaction.txData.baseData.to.toLowerCase() === SwapExchangeProxy: {
+      case transaction.txDataUnion.ethTxData1559?.baseData.to.toLowerCase() === SwapExchangeProxy: {
         return (
           <DetailRow>
             <DetailTextDark>
@@ -308,15 +309,30 @@ const PortfolioTransactionItem = (props: Props) => {
       </StatusRow>
       <DetailRow>
         <BalanceColumn>
-          <DetailTextDark>{/* We need to return a Transaction Time Stamp to calculate Fiat value here */}{formatFiatAmountWithCommasAndDecimals(transactionDetails.fiatValue, defaultCurrencies.fiat)}</DetailTextDark>
-          <DetailTextLight>{formatTokenAmountWithCommasAndDecimals(transactionDetails.nativeCurrencyTotal, selectedNetwork.symbol)}</DetailTextLight>
+          <DetailTextDark>
+            {/* We need to return a Transaction Time Stamp to calculate Fiat value here */}
+            {transactionDetails.fiatValue
+              .formatAsFiat(defaultCurrencies.fiat)}
+          </DetailTextDark>
+          <DetailTextLight>{transactionDetails.formattedNativeCurrencyTotal}</DetailTextLight>
         </BalanceColumn>
         <TransactionFeesTooltip
           text={
             <>
               <TransactionFeeTooltipTitle>{getLocale('braveWalletAllowSpendTransactionFee')}</TransactionFeeTooltipTitle>
-              <TransactionFeeTooltipBody>{formatTokenAmountWithCommasAndDecimals(formatBalance(transactionDetails.gasFee, selectedNetwork.decimals), selectedNetwork.symbol)}</TransactionFeeTooltipBody>
-              <TransactionFeeTooltipBody>{formatFiatAmountWithCommasAndDecimals(transactionDetails.gasFeeFiat, defaultCurrencies.fiat)}</TransactionFeeTooltipBody>
+              <TransactionFeeTooltipBody>
+                {
+                  new Amount(transactionDetails.gasFee)
+                    .divideByDecimals(selectedNetwork.decimals)
+                    .formatAsAsset(6, selectedNetwork.symbol)
+                }
+              </TransactionFeeTooltipBody>
+              <TransactionFeeTooltipBody>
+                {
+                  new Amount(transactionDetails.gasFeeFiat)
+                    .formatAsFiat(defaultCurrencies.fiat)
+                }
+              </TransactionFeeTooltipBody>
             </>
           }
         >
@@ -325,7 +341,7 @@ const PortfolioTransactionItem = (props: Props) => {
           </CoinsButton>
         </TransactionFeesTooltip>
 
-        {transactionDetails.status !== BraveWallet.TransactionStatus.Rejected ? (
+        {(transactionDetails.status !== BraveWallet.TransactionStatus.Rejected && transactionDetails.status !== BraveWallet.TransactionStatus.Unapproved) ? (
           <MoreButton onClick={onShowTransactionPopup}>
             <MoreIcon />
           </MoreButton>
@@ -335,10 +351,17 @@ const PortfolioTransactionItem = (props: Props) => {
 
         {showTransactionPopup &&
           <TransactionPopup>
-            {[BraveWallet.TransactionStatus.Approved, BraveWallet.TransactionStatus.Submitted, BraveWallet.TransactionStatus.Confirmed] &&
+            {[BraveWallet.TransactionStatus.Approved, BraveWallet.TransactionStatus.Submitted, BraveWallet.TransactionStatus.Confirmed].includes(transactionDetails.status) &&
               <TransactionPopupItem
                 onClick={onClickViewOnBlockExplorer('tx', transaction.txHash)}
                 text={getLocale('braveWalletTransactionExplorer')}
+              />
+            }
+
+            {[BraveWallet.TransactionStatus.Approved, BraveWallet.TransactionStatus.Submitted, BraveWallet.TransactionStatus.Confirmed].includes(transactionDetails.status) &&
+              <TransactionPopupItem
+                onClick={() => onClickCopyTransactionHash(transaction.txHash)}
+                text={getLocale('braveWalletTransactionCopyHash')}
               />
             }
 

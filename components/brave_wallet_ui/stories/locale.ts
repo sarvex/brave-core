@@ -57,6 +57,7 @@ provideStrings({
   // Portfolio View
   braveWalletAddCoin: 'Add Coin',
   braveWalletBalance: 'Balance',
+  braveWalletPortfolioAssetNetworkDescription: '$1 on $2',
 
   // Portfolio SubView
   braveWalletAccounts: 'Accounts',
@@ -175,8 +176,9 @@ provideStrings({
   braveWalletCreateAccountImportAccount: 'Import $1 account',
   braveWalletCreateAccountTitle: 'Select one of the following account types',
   braveWalletCreateAccountEthereumDescription: 'Supports EVM compatible assets on the Ethereum blockchain (ERC-20, ERC-721, ERC-1551, ERC-1155)',
-  braveWalletCreateAccountSolanaDescription: 'Supports SLP compatible assets on the Solana blockchain',
+  braveWalletCreateAccountSolanaDescription: 'Supports SPL compatible assets on the Solana blockchain',
   braveWalletCreateAccountFilecoinDescription: 'Store FIL asset',
+  braveWalletFilecoinPrivateKeyProtocol: 'Private key $1',
 
   // Import Account
   braveWalletImportAccountDisclaimer: 'These accounts can be used with web 3 DApps, and can be shown in your portfolio. However, note that secondary accounts cannot be restored via recovery phrase from your primary account backup.',
@@ -197,7 +199,7 @@ provideStrings({
   braveWalletAddCheckedAccountsHardwareWallet: 'Add checked accounts',
   braveWalletLoadMoreAccountsHardwareWallet: 'Load more',
   braveWalletLoadingMoreAccountsHardwareWallet: 'Loading more...',
-  braveWalletSearchScannedAccounts: 'Search account 0x',
+  braveWalletSearchScannedAccounts: 'Search account',
   braveWalletSwitchHDPathTextHardwareWallet: 'Try switching HD path (above) if you cannot find the account you are looking for.',
   braveWalletLedgerLiveDerivationPath: 'Ledger Live',
   braveWalletLedgerLegacyDerivationPath: 'Legacy (MEW/MyCrypto)',
@@ -230,6 +232,7 @@ provideStrings({
   braveWalletWatchListAdvanced: 'Advanced',
   braveWalletWatchListCoingeckoId: 'Coingecko ID',
   braveWalletIconURL: 'Icon URL',
+  braveWalletAddAsset: 'Add asset',
 
   // AmountPresets
   braveWalletPreset25: '25%',
@@ -378,6 +381,7 @@ provideStrings({
   braveWalletTransactionReceived: 'received',
   braveWalletTransactionExplorerMissing: 'Block explorer URL is not available.',
   braveWalletTransactionExplorer: 'View on block explorer',
+  braveWalletTransactionCopyHash: 'Copy transaction hash',
   braveWalletTransactionSpeedup: 'Speedup transaction',
   braveWalletTransactionCancel: 'Cancel transaction',
   braveWalletTransactionRetry: 'Retry transaction',
@@ -423,6 +427,7 @@ provideStrings({
   braveWalletContractAddressError: 'The receiving address is a tokens contract address',
   braveWalletAddressMissingChecksumInfoWarning: 'Missing checksum information',
   braveWalletNotValidChecksumAddressError: 'Invalid checksum information',
+  braveWalletMissingGasLimitError: 'Missing gas limit',
 
   // Transaction Queue Strings
   braveWalletQueueOf: 'of',

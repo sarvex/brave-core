@@ -81,11 +81,11 @@ mojom::TransactionInfoPtr EthTxStateManager::TxMetaToTransactionInfo(
   mojom::GasEstimation1559Ptr gas_estimation_1559_ptr = nullptr;
   if (meta.tx->type() == 1) {
     // When type is 1 it's always Eip2930Transaction
-    auto* tx2930 = reinterpret_cast<Eip2930Transaction*>(meta.tx.get());
+    auto* tx2930 = static_cast<Eip2930Transaction*>(meta.tx.get());
     chain_id = Uint256ValueToHex(tx2930->chain_id());
   } else if (meta.tx->type() == 2) {
     // When type is 2 it's always Eip1559Transaction
-    auto* tx1559 = reinterpret_cast<Eip1559Transaction*>(meta.tx.get());
+    auto* tx1559 = static_cast<Eip1559Transaction*>(meta.tx.get());
     chain_id = Uint256ValueToHex(tx1559->chain_id());
     max_priority_fee_per_gas =
         Uint256ValueToHex(tx1559->max_priority_fee_per_gas());
@@ -108,7 +108,7 @@ mojom::TransactionInfoPtr EthTxStateManager::TxMetaToTransactionInfo(
 
   return mojom::TransactionInfo::New(
       meta.id, meta.from.ToChecksumAddress(), meta.tx_hash,
-      mojom::TxData1559::New(
+      mojom::TxDataUnion::NewEthTxData1559(mojom::TxData1559::New(
           mojom::TxData::New(
               meta.tx->nonce() ? Uint256ValueToHex(meta.tx->nonce().value())
                                : "",
@@ -117,7 +117,7 @@ mojom::TransactionInfoPtr EthTxStateManager::TxMetaToTransactionInfo(
               meta.tx->to().ToChecksumAddress(),
               Uint256ValueToHex(meta.tx->value()), meta.tx->data()),
           chain_id, max_priority_fee_per_gas, max_fee_per_gas,
-          std::move(gas_estimation_1559_ptr)),
+          std::move(gas_estimation_1559_ptr))),
       meta.status, tx_type, tx_params, tx_args,
       base::Milliseconds(meta.created_time.ToJavaTime()),
       base::Milliseconds(meta.submitted_time.ToJavaTime()),
@@ -224,7 +224,7 @@ std::unique_ptr<EthTxStateManager::TxMeta> EthTxStateManager::ValueToTxMeta(
 
 void EthTxStateManager::AddOrUpdateTx(const TxMeta& meta) {
   DictionaryPrefUpdate update(prefs_, kBraveWalletTransactions);
-  base::DictionaryValue* dict = update.Get();
+  base::Value* dict = update.Get();
   const std::string path = GetNetworkId(prefs_, chain_id_) + "." + meta.id;
   bool is_add = dict->FindPath(path) == nullptr;
   dict->SetPath(path, TxMetaToValue(meta));
@@ -244,8 +244,7 @@ void EthTxStateManager::AddOrUpdateTx(const TxMeta& meta) {
 
 std::unique_ptr<EthTxStateManager::TxMeta> EthTxStateManager::GetTx(
     const std::string& id) {
-  const base::DictionaryValue* dict =
-      prefs_->GetDictionary(kBraveWalletTransactions);
+  const base::Value* dict = prefs_->GetDictionary(kBraveWalletTransactions);
   if (!dict)
     return nullptr;
   const base::Value* value =
@@ -258,7 +257,7 @@ std::unique_ptr<EthTxStateManager::TxMeta> EthTxStateManager::GetTx(
 
 void EthTxStateManager::DeleteTx(const std::string& id) {
   DictionaryPrefUpdate update(prefs_, kBraveWalletTransactions);
-  base::DictionaryValue* dict = update.Get();
+  base::Value* dict = update.Get();
   dict->RemovePath(GetNetworkId(prefs_, chain_id_) + "." + id);
 }
 
@@ -271,8 +270,7 @@ EthTxStateManager::GetTransactionsByStatus(
     absl::optional<mojom::TransactionStatus> status,
     absl::optional<EthAddress> from) {
   std::vector<std::unique_ptr<EthTxStateManager::TxMeta>> result;
-  const base::DictionaryValue* dict =
-      prefs_->GetDictionary(kBraveWalletTransactions);
+  const base::Value* dict = prefs_->GetDictionary(kBraveWalletTransactions);
   const base::Value* network_dict =
       dict->FindKey(GetNetworkId(prefs_, chain_id_));
   if (!network_dict)

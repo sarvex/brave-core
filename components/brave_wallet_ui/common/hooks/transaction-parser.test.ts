@@ -119,11 +119,13 @@ describe('useTransactionParser hook', () => {
           ...mockTransactionInfo,
           txType,
           fromAddress: '0xdeadbeef',
-          txData: {
-            ...mockTransactionInfo.txData,
-            baseData: {
-              ...mockTransactionInfo.txData.baseData,
-              to: name === '0x Swap' ? SwapExchangeProxy : '0xdeadbeef'
+          txDataUnion: {
+            ethTxData1559: {
+              ...mockTransactionInfo.txDataUnion.ethTxData1559,
+              baseData: {
+                ...mockTransactionInfo.txDataUnion.ethTxData1559.baseData,
+                to: name === '0x Swap' ? SwapExchangeProxy : '0xdeadbeef'
+              }
             }
           }
         })
@@ -152,9 +154,9 @@ describe('useTransactionParser hook', () => {
           txArgs: txType === BraveWallet.TransactionType.ETHSend ? [] : ['mockArg1', 'mockArg2'],
           txType,
           txData: {
-            ...mockTransactionInfo.txData,
+            ...mockTransactionInfo.txDataUnion.ethTxData1559,
             baseData: {
-              ...mockTransactionInfo.txData.baseData,
+              ...mockTransactionInfo.txDataUnion.ethTxData1559.baseData,
               to: name === '0x Swap' ? SwapExchangeProxy : '0xdeadbeef'
             }
           }
@@ -248,12 +250,12 @@ describe('useTransactionParser hook', () => {
             : ['mockOwner', 'mockRecipient', 'mockTokenID'],
           txType,
           txData: {
-            ...mockTransactionInfo.txData,
+            ...mockTransactionInfo.txDataUnion.ethTxData1559,
             baseData: {
-              ...mockTransactionInfo.txData.baseData,
+              ...mockTransactionInfo.txDataUnion.ethTxData1559.baseData,
               to: txType === BraveWallet.TransactionType.ERC20Transfer
                 ? mockERC20Token.contractAddress
-                : mockTransactionInfo.txData.baseData.to,
+                : mockTransactionInfo.txDataUnion.ethTxData1559.baseData.to,
               value: '0x0', // 0 ETH
               gasLimit: '0x5208', // 21000
               gasPrice: '0x22ecb25c00' // 150 Gwei
@@ -293,9 +295,9 @@ describe('useTransactionParser hook', () => {
             : ['mockOwner', 'mockRecipient', 'mockTokenID'],
           txType,
           txData: {
-            ...mockTransactionInfo.txData,
+            ...mockTransactionInfo.txDataUnion.ethTxData1559,
             baseData: {
-              ...mockTransactionInfo.txData.baseData,
+              ...mockTransactionInfo.txDataUnion.ethTxData1559.baseData,
               value: '0x0',
               gasLimit: '0x5208', // 21000
               gasPrice: '0x22ecb25c00' // 150 Gwei
@@ -339,9 +341,9 @@ describe('useTransactionParser hook', () => {
           fromAddress: '0xdeadbeef',
           txType,
           txData: {
-            ...mockTransactionInfo.txData,
+            ...mockTransactionInfo.txDataUnion.ethTxData1559,
             baseData: {
-              ...mockTransactionInfo.txData.baseData,
+              ...mockTransactionInfo.txDataUnion.ethTxData1559.baseData,
               value: '0xde0b6b3a7640000', // 1 ETH
               gasLimit: '0x5208', // 21000
               gasPrice: '0x22ecb25c00' // 150 Gwei
@@ -380,9 +382,9 @@ describe('useTransactionParser hook', () => {
           fromAddress: '0xdeadbeef',
           txType,
           txData: {
-            ...mockTransactionInfo.txData,
+            ...mockTransactionInfo.txDataUnion.ethTxData1559,
             baseData: {
-              ...mockTransactionInfo.txData.baseData,
+              ...mockTransactionInfo.txDataUnion.ethTxData1559.baseData,
               value: '0xde0b6b3a7640000', // 1 ETH
               gasLimit: '0x5208', // 21000
               gasPrice: '0x22ecb25c00' // 150 Gwei
@@ -431,9 +433,9 @@ describe('useTransactionParser hook', () => {
           ],
           txType: BraveWallet.TransactionType.ERC20Transfer,
           txData: {
-            ...mockTransactionInfo.txData,
+            ...mockTransactionInfo.txDataUnion.ethTxData1559,
             baseData: {
-              ...mockTransactionInfo.txData.baseData,
+              ...mockTransactionInfo.txDataUnion.ethTxData1559.baseData,
               to: mockERC20Token.contractAddress,
               value: '0x0', // 0 ETH
               gasLimit: '0x5208', // 21000
@@ -482,14 +484,16 @@ describe('useTransactionParser hook', () => {
             '0xde0b6b3a7640000' // 1 DOG
           ],
           txType: BraveWallet.TransactionType.ERC20Transfer,
-          txData: {
-            ...mockTransactionInfo.txData,
-            baseData: {
-              ...mockTransactionInfo.txData.baseData,
-              to: mockERC20Token.contractAddress,
-              value: '0x0', // 0 ETH
-              gasLimit: '0x5208', // 21000
-              gasPrice: '0x22ecb25c00' // 150 Gwei
+          txDataUnion: {
+            ethTxData1559: {
+              ...mockTransactionInfo.txDataUnion.ethTxData1559,
+              baseData: {
+                ...mockTransactionInfo.txDataUnion.ethTxData1559.baseData,
+                to: mockERC20Token.contractAddress,
+                value: '0x0', // 0 ETH
+                gasLimit: '0x5208', // 21000
+                gasPrice: '0x22ecb25c00' // 150 Gwei
+              }
             }
           }
         })
@@ -515,9 +519,9 @@ describe('useTransactionParser hook', () => {
           ...mockTransactionInfo,
           txType,
           txData: {
-            ...mockTransactionInfo.txData,
+            ...mockTransactionInfo.txDataUnion.ethTxData1559,
             baseData: {
-              ...mockTransactionInfo.txData.baseData,
+              ...mockTransactionInfo.txDataUnion.ethTxData1559.baseData,
               to: 'test'
             }
           },
@@ -538,11 +542,13 @@ describe('useTransactionParser hook', () => {
         const parsedTransaction = transactionParser({
           ...mockTransactionInfo,
           txType,
-          txData: {
-            ...mockTransactionInfo.txData,
-            baseData: {
-              ...mockTransactionInfo.txData.baseData,
-              to: 'mockContractAddress'
+          txDataUnion: {
+            ethTxData1559: {
+              ...mockTransactionInfo.txDataUnion.ethTxData1559,
+              baseData: {
+                ...mockTransactionInfo.txDataUnion.ethTxData1559.baseData,
+                to: 'mockContractAddress'
+              }
             }
           },
           txArgs: [
@@ -562,11 +568,13 @@ describe('useTransactionParser hook', () => {
         const parsedTransaction = transactionParser({
           ...mockTransactionInfo,
           txType,
-          txData: {
-            ...mockTransactionInfo.txData,
-            baseData: {
-              ...mockTransactionInfo.txData.baseData,
-              to: 'mockContractAddress'
+          txDataUnion: {
+            ethTxData1559: {
+              ...mockTransactionInfo.txDataUnion.ethTxData1559,
+              baseData: {
+                ...mockTransactionInfo.txDataUnion.ethTxData1559.baseData,
+                to: 'mockContractAddress'
+              }
             }
           },
           txArgs: [
@@ -576,6 +584,80 @@ describe('useTransactionParser hook', () => {
         })
 
         expect(parsedTransaction.symbol).toEqual('DOG')
+      })
+    })
+  })
+
+  describe('check for empty gas limit', () => {
+    describe.each([
+      ['ERC20Approve', BraveWallet.TransactionType.ERC20Approve],
+      ['ERC20Transfer', BraveWallet.TransactionType.ERC20Transfer],
+      ['ERC721TransferFrom', BraveWallet.TransactionType.ERC721TransferFrom],
+      ['ERC721SafeTransferFrom', BraveWallet.TransactionType.ERC721SafeTransferFrom],
+      ['ETHSend', BraveWallet.TransactionType.ETHSend],
+      ['Other', BraveWallet.TransactionType.Other]
+    ])('%s', (_, txType) => {
+      it('should return missingGasLimitError if gas limit is zero or empty', () => {
+        const { result: { current: transactionParser } } = renderHook(() => useTransactionParser(
+          mockNetwork, [mockAccount], [], [], [mockERC20Token]
+        ))
+
+        const baseMockTransactionInfo = {
+          ...getMockedTransactionInfo(),
+          txType,
+          txArgs: [
+            'mockRecipient',
+            'mockAmount'
+          ]
+        }
+
+        const mockTransactionInfo1 = {
+          ...baseMockTransactionInfo,
+          txDataUnion: {
+            ethTxData1559: {
+              ...baseMockTransactionInfo.txDataUnion.ethTxData1559,
+              baseData: {
+                ...baseMockTransactionInfo.txDataUnion.ethTxData1559.baseData,
+                gasLimit: ''
+              }
+            }
+          }
+        }
+        const parsedTransaction1 = transactionParser(mockTransactionInfo1)
+        expect(parsedTransaction1.gasLimit).toEqual('')
+        expect(parsedTransaction1.missingGasLimitError).toBeTruthy()
+
+        const mockTransactionInfo2 = {
+          ...baseMockTransactionInfo,
+          txDataUnion: {
+            ethTxData1559: {
+              ...baseMockTransactionInfo.txDataUnion.ethTxData1559,
+              baseData: {
+                ...baseMockTransactionInfo.txDataUnion.ethTxData1559.baseData,
+                gasLimit: '0x0'
+              }
+            }
+          }
+        }
+        const parsedTransaction2 = transactionParser(mockTransactionInfo2)
+        expect(parsedTransaction2.gasLimit).toEqual('0')
+        expect(parsedTransaction2.missingGasLimitError).toBeTruthy()
+
+        const mockTransactionInfo3 = {
+          ...baseMockTransactionInfo,
+          txDataUnion: {
+            ethTxData1559: {
+              ...baseMockTransactionInfo.txDataUnion.ethTxData1559,
+              baseData: {
+                ...baseMockTransactionInfo.txDataUnion.ethTxData1559.baseData,
+                gasLimit: '0x1'
+              }
+            }
+          }
+        }
+        const parsedTransaction3 = transactionParser(mockTransactionInfo3)
+        expect(parsedTransaction3.gasLimit).toEqual('1')
+        expect(parsedTransaction3.missingGasLimitError).toBeUndefined()
       })
     })
   })

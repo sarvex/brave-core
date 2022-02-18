@@ -15,6 +15,7 @@
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/time/time.h"
+#include "brave/components/brave_wallet/browser/brave_wallet_p3a.h"
 #include "brave/components/brave_wallet/browser/brave_wallet_service_delegate.h"
 #include "brave/components/brave_wallet/common/brave_wallet.mojom.h"
 #include "components/keyed_service/core/keyed_service.h"
@@ -35,7 +36,7 @@ constexpr char kBraveWalletMonthlyHistogramName[] = "Brave.Wallet.UsageMonthly";
 
 class KeyringService;
 class JsonRpcService;
-class EthTxService;
+class TxService;
 
 class BraveWalletService : public KeyedService,
                            public mojom::BraveWalletService,
@@ -46,12 +47,11 @@ class BraveWalletService : public KeyedService,
   using AddSuggestTokenCallback =
       base::OnceCallback<void(bool, mojom::ProviderError, const std::string&)>;
 
-  explicit BraveWalletService(
-      std::unique_ptr<BraveWalletServiceDelegate> delegate,
-      KeyringService* keyring_service,
-      JsonRpcService* json_rpc_service,
-      EthTxService* eth_tx_service,
-      PrefService* prefs);
+  BraveWalletService(std::unique_ptr<BraveWalletServiceDelegate> delegate,
+                     KeyringService* keyring_service,
+                     JsonRpcService* json_rpc_service,
+                     TxService* tx_service,
+                     PrefService* prefs);
   ~BraveWalletService() override;
 
   BraveWalletService(const BraveWalletService&) = delete;
@@ -189,8 +189,9 @@ class BraveWalletService : public KeyedService,
   std::unique_ptr<BraveWalletServiceDelegate> delegate_;
   raw_ptr<KeyringService> keyring_service_ = nullptr;
   raw_ptr<JsonRpcService> json_rpc_service_ = nullptr;
-  raw_ptr<EthTxService> eth_tx_service_ = nullptr;
+  raw_ptr<TxService> tx_service_ = nullptr;
   raw_ptr<PrefService> prefs_ = nullptr;
+  BraveWalletP3A brave_wallet_p3a_;
   mojo::ReceiverSet<mojom::BraveWalletService> receivers_;
   PrefChangeRegistrar pref_change_registrar_;
   base::RepeatingTimer p3a_periodic_timer_;

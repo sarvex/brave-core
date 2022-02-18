@@ -12,11 +12,13 @@
 #include "brave/components/brave_component_updater/browser/local_data_files_service.h"
 #include "brave/components/brave_shields/browser/ad_block_service.h"
 #include "brave/components/brave_shields/browser/brave_shields_util.h"
+#include "brave/components/brave_shields/browser/test_filters_provider.h"
 #include "brave/components/brave_shields/common/features.h"
 #include "chrome/browser/interstitials/security_interstitial_page_test_utils.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/test/base/ui_test_utils.h"
+#include "components/content_settings/core/browser/host_content_settings_map.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/test_navigation_observer.h"
 #include "net/base/features.h"
@@ -34,7 +36,7 @@ class EphemeralStorage1pDomainBlockBrowserTest
          brave_shields::features::kBraveDomainBlock1PES},
         {});
   }
-  ~EphemeralStorage1pDomainBlockBrowserTest() override {}
+  ~EphemeralStorage1pDomainBlockBrowserTest() override = default;
 
   void SetUpOnMainThread() override {
     EphemeralStorageBrowserTest::SetUpOnMainThread();
@@ -44,12 +46,13 @@ class EphemeralStorage1pDomainBlockBrowserTest
 
   void UpdateAdBlockInstanceWithRules(const std::string& rules,
                                       const std::string& resources = "") {
+    source_provider_ =
+        std::make_unique<brave_shields::TestFiltersProvider>(rules, resources);
+
     brave_shields::AdBlockService* ad_block_service =
         g_brave_browser_process->ad_block_service();
-    ad_block_service->GetTaskRunner()->PostTask(
-        FROM_HERE, base::BindOnce(&brave_shields::AdBlockService::ResetForTest,
-                                  base::Unretained(ad_block_service), rules,
-                                  resources, true));
+    ad_block_service->UseSourceProvidersForTest(source_provider_.get(),
+                                                source_provider_.get());
     WaitForAdBlockServiceThreads();
   }
 
@@ -116,6 +119,10 @@ class EphemeralStorage1pDomainBlockBrowserTest
     WebContents* first_party_tab =
         BlockAndNavigateToBlockedDomain(a_site_simple_url_, false, false);
 
+    EXPECT_TRUE(GetAllCookies().empty());
+    EXPECT_EQ(GetCookieSetting(a_site_simple_url_),
+              ContentSetting::CONTENT_SETTING_SESSION_ONLY);
+
     // After keepalive values should be cleared.
     ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), b_site_simple_url_));
     WaitForCleanupAfterKeepAlive();
@@ -123,11 +130,15 @@ class EphemeralStorage1pDomainBlockBrowserTest
 
     ExpectValuesFromFrameAreEmpty(
         FROM_HERE, GetValuesFromFrame(first_party_tab->GetMainFrame()));
+    EXPECT_EQ(GetCookieSetting(a_site_simple_url_),
+              ContentSetting::CONTENT_SETTING_SESSION_ONLY);
   }
 
   void NavigateToBlockedDomainAndExpectNotEphemeral() {
     WebContents* first_party_tab =
         BlockAndNavigateToBlockedDomain(a_site_simple_url_, false, false);
+    EXPECT_EQ(GetCookieSetting(a_site_simple_url_),
+              ContentSetting::CONTENT_SETTING_ALLOW);
 
     // After keepalive main frame values should not be cleared.
     ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), b_site_simple_url_));
@@ -141,9 +152,17 @@ class EphemeralStorage1pDomainBlockBrowserTest
       EXPECT_EQ("a.com", first_party_values.session_storage);
       EXPECT_EQ("from=a.com", first_party_values.cookies);
     }
+    EXPECT_EQ(GetCookieSetting(a_site_simple_url_),
+              ContentSetting::CONTENT_SETTING_ALLOW);
+  }
+
+  ContentSetting GetCookieSetting(const GURL& url) {
+    return content_settings()->GetContentSetting(url, url,
+                                                 ContentSettingsType::COOKIES);
   }
 
  protected:
+  std::unique_ptr<brave_shields::TestFiltersProvider> source_provider_;
   base::test::ScopedFeatureList scoped_feature_list_;
   GURL a_site_simple_url_;
   GURL b_site_simple_url_;
@@ -151,18 +170,11 @@ class EphemeralStorage1pDomainBlockBrowserTest
 
 IN_PROC_BROWSER_TEST_F(EphemeralStorage1pDomainBlockBrowserTest,
                        FirstPartyEphemeralIsAutoEnabledInNormalBlockingMode) {
-  WebContents* first_party_tab =
-      BlockAndNavigateToBlockedDomain(a_site_simple_url_, false, false);
+  NavigateToBlockedDomainAndExpectEphemeralEnabled();
 
-  EXPECT_TRUE(GetAllCookies().empty());
-
-  // After keepalive values should be cleared.
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), b_site_simple_url_));
-  WaitForCleanupAfterKeepAlive();
-  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), a_site_simple_url_));
-
-  ExpectValuesFromFrameAreEmpty(
-      FROM_HERE, GetValuesFromFrame(first_party_tab->GetMainFrame()));
+  EXPECT_EQ(GetCookieSetting(a_site_simple_url_),
+            ContentSetting::CONTENT_SETTING_ALLOW);
 }
 
 IN_PROC_BROWSER_TEST_F(EphemeralStorage1pDomainBlockBrowserTest,
@@ -172,6 +184,8 @@ IN_PROC_BROWSER_TEST_F(EphemeralStorage1pDomainBlockBrowserTest,
 
   NavigateToBlockedDomainAndExpectNotEphemeral();
   EXPECT_EQ(1u, GetAllCookies().size());
+  EXPECT_EQ(GetCookieSetting(a_site_simple_url_),
+            ContentSetting::CONTENT_SETTING_ALLOW);
 }
 
 IN_PROC_BROWSER_TEST_F(
@@ -188,6 +202,8 @@ IN_PROC_BROWSER_TEST_F(
 
   NavigateToBlockedDomainAndExpectNotEphemeral();
   EXPECT_EQ(1u, GetAllCookies().size());
+  EXPECT_EQ(GetCookieSetting(a_site_simple_url_),
+            ContentSetting::CONTENT_SETTING_ALLOW);
 }
 
 IN_PROC_BROWSER_TEST_F(
@@ -195,7 +211,8 @@ IN_PROC_BROWSER_TEST_F(
     FirstPartyEphemeralIsAutoEnabledInAggressiveBlockingMode) {
   WebContents* first_party_tab =
       BlockAndNavigateToBlockedDomain(a_site_simple_url_, true, false);
-
+  EXPECT_EQ(GetCookieSetting(a_site_simple_url_),
+            ContentSetting::CONTENT_SETTING_SESSION_ONLY);
   EXPECT_EQ(0u, GetAllCookies().size());
 
   // After keepalive values should be cleared.
@@ -210,6 +227,12 @@ IN_PROC_BROWSER_TEST_F(
   ExpectValuesFromFrameAreEmpty(
       FROM_HERE, GetValuesFromFrame(first_party_tab->GetMainFrame()));
   EXPECT_EQ(0u, GetAllCookies().size());
+  EXPECT_EQ(GetCookieSetting(a_site_simple_url_),
+            ContentSetting::CONTENT_SETTING_SESSION_ONLY);
+
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), b_site_simple_url_));
+  EXPECT_EQ(GetCookieSetting(a_site_simple_url_),
+            ContentSetting::CONTENT_SETTING_ALLOW);
 }
 
 IN_PROC_BROWSER_TEST_F(EphemeralStorage1pDomainBlockBrowserTest,

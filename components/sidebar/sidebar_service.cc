@@ -8,11 +8,9 @@
 #include <algorithm>
 #include <utility>
 
-#include "base/feature_list.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/values.h"
 #include "brave/components/sidebar/constants.h"
-#include "brave/components/sidebar/features.h"
 #include "brave/components/sidebar/pref_names.h"
 #include "components/grit/brave_components_strings.h"
 #include "components/prefs/pref_registry_simple.h"
@@ -39,21 +37,18 @@ SidebarItem GetBuiltInItemForType(SidebarItem::BuiltInItemType type) {
           l10n_util::GetStringUTF16(IDS_SIDEBAR_WALLET_ITEM_TITLE),
           SidebarItem::Type::kTypeBuiltIn,
           SidebarItem::BuiltInItemType::kWallet, false);
-      break;
     case SidebarItem::BuiltInItemType::kBookmarks:
       return SidebarItem::Create(
-          GURL("chrome://bookmarks/"),
+          GURL(kSidebarBookmarksURL),
           l10n_util::GetStringUTF16(IDS_SIDEBAR_BOOKMARKS_ITEM_TITLE),
           SidebarItem::Type::kTypeBuiltIn,
           SidebarItem::BuiltInItemType::kBookmarks, true);
-      break;
     case SidebarItem::BuiltInItemType::kHistory:
       return SidebarItem::Create(
           GURL("chrome://history/"),
           l10n_util::GetStringUTF16(IDS_SIDEBAR_HISTORY_ITEM_TITLE),
           SidebarItem::Type::kTypeBuiltIn,
           SidebarItem::BuiltInItemType::kHistory, true);
-      break;
     default:
       NOTREACHED();
   }
@@ -67,7 +62,7 @@ SidebarItem::BuiltInItemType GetBuiltInItemTypeForURL(const std::string& url) {
   if (url == "chrome://wallet/")
     return SidebarItem::BuiltInItemType::kWallet;
 
-  if (url == "chrome://bookmarks/")
+  if (url == kSidebarBookmarksURL || url == "chrome://bookmarks/")
     return SidebarItem::BuiltInItemType::kBookmarks;
 
   if (url == "chrome://history/")
@@ -88,8 +83,6 @@ std::vector<SidebarItem> GetDefaultSidebarItems() {
   items.push_back(GetBuiltInItemForType(SidebarItem::BuiltInItemType::kWallet));
   items.push_back(
       GetBuiltInItemForType(SidebarItem::BuiltInItemType::kBookmarks));
-  items.push_back(
-      GetBuiltInItemForType(SidebarItem::BuiltInItemType::kHistory));
   return items;
 }
 
@@ -97,9 +90,6 @@ std::vector<SidebarItem> GetDefaultSidebarItems() {
 
 // static
 void SidebarService::RegisterProfilePrefs(PrefRegistrySimple* registry) {
-  if (!base::FeatureList::IsEnabled(kSidebarFeature))
-    return;
-
   registry->RegisterListPref(kSidebarItems);
   registry->RegisterIntegerPref(
       kSidebarShowOption, static_cast<int>(ShowSidebarOption::kShowAlways));
@@ -110,6 +100,8 @@ SidebarService::SidebarService(PrefService* prefs) : prefs_(prefs) {
   DCHECK(prefs_);
   LoadSidebarItems();
 
+  MigrateSidebarShowOptions();
+
   pref_change_registrar_.Init(prefs_);
   pref_change_registrar_.Add(
       kSidebarShowOption,
@@ -118,6 +110,17 @@ SidebarService::SidebarService(PrefService* prefs) : prefs_(prefs) {
 }
 
 SidebarService::~SidebarService() = default;
+
+void SidebarService::MigrateSidebarShowOptions() {
+  auto option =
+      static_cast<ShowSidebarOption>(prefs_->GetInteger(kSidebarShowOption));
+  // Show on click is deprecated. Treat it as show on mouse over.
+  if (option == ShowSidebarOption::kShowOnClick) {
+    option = ShowSidebarOption::kShowOnMouseOver;
+    prefs_->SetInteger(kSidebarShowOption,
+                       static_cast<int>(ShowSidebarOption::kShowOnMouseOver));
+  }
+}
 
 void SidebarService::AddItem(const SidebarItem& item) {
   items_.push_back(item);
@@ -212,6 +215,7 @@ SidebarService::ShowSidebarOption SidebarService::GetSidebarShowOption() const {
 }
 
 void SidebarService::SetSidebarShowOption(ShowSidebarOption show_options) {
+  DCHECK_NE(ShowSidebarOption::kShowOnClick, show_options);
   prefs_->SetInteger(kSidebarShowOption, static_cast<int>(show_options));
 }
 
@@ -248,7 +252,9 @@ void SidebarService::LoadSidebarItems() {
         // Fallback when built-in item type key is not existed.
         built_in_item = GetBuiltInItemForURL(url);
       }
-      items_.push_back(built_in_item);
+      // Remove blocked item from existing users data.
+      if (!IsBlockedBuiltInItem(built_in_item))
+        items_.push_back(built_in_item);
       continue;
     }
 
@@ -270,6 +276,13 @@ void SidebarService::LoadSidebarItems() {
         GURL(url), base::UTF8ToUTF16(title), type,
         SidebarItem::BuiltInItemType::kNone, open_in_panel));
   }
+}
+
+// For now, only builtin history item is blocked.
+bool SidebarService::IsBlockedBuiltInItem(const SidebarItem& item) const {
+  if (!IsBuiltInType(item))
+    return false;
+  return item.built_in_item_type == SidebarItem::BuiltInItemType::kHistory;
 }
 
 void SidebarService::OnPreferenceChanged(const std::string& pref_name) {

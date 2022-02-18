@@ -5,6 +5,8 @@
 
 #include "brave/browser/ui/views/sidebar/sidebar_container_view.h"
 
+#include <utility>
+
 #include "base/bind.h"
 #include "brave/browser/themes/theme_properties.h"
 #include "brave/browser/ui/brave_browser.h"
@@ -18,11 +20,14 @@
 #include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "content/public/browser/browser_context.h"
+#include "content/public/browser/web_contents.h"
+#include "ui/base/models/menu_model.h"
 #include "ui/base/theme_provider.h"
 #include "ui/events/event_observer.h"
 #include "ui/events/types/event_type.h"
 #include "ui/gfx/geometry/point.h"
 #include "ui/views/border.h"
+#include "ui/views/controls/menu/menu_runner.h"
 #include "ui/views/controls/webview/webview.h"
 #include "ui/views/event_monitor.h"
 #include "ui/views/widget/widget.h"
@@ -88,6 +93,8 @@ void SidebarContainerView::Init() {
 
   AddChildViews();
   UpdateChildViewVisibility();
+  // Hide by default. Visibility will be controlled by show options later.
+  DoHideSidebar(false);
 }
 
 void SidebarContainerView::SetSidebarShowOption(
@@ -107,6 +114,33 @@ void SidebarContainerView::SetSidebarShowOption(
 
 void SidebarContainerView::UpdateSidebar() {
   sidebar_control_view_->Update();
+}
+
+void SidebarContainerView::ShowCustomContextMenu(
+    const gfx::Point& point,
+    std::unique_ptr<ui::MenuModel> menu_model) {
+  // Show context menu at in screen coordinates.
+  gfx::Point screen_point = point;
+  ConvertPointToScreen(sidebar_panel_view_, &screen_point);
+  context_menu_model_ = std::move(menu_model);
+  context_menu_runner_ = std::make_unique<views::MenuRunner>(
+      context_menu_model_.get(),
+      views::MenuRunner::HAS_MNEMONICS | views::MenuRunner::CONTEXT_MENU);
+  const int active_index = sidebar_model_->active_index();
+  if (active_index == -1) {
+    LOG(ERROR) << __func__
+               << " sidebar panel UI is loaded at non sidebar panel!";
+    return;
+  }
+  context_menu_runner_->RunMenuAt(
+      GetWidget(), nullptr, gfx::Rect(screen_point, gfx::Size()),
+      views::MenuAnchorPosition::kTopLeft, ui::MENU_SOURCE_MOUSE,
+      sidebar_model_->GetWebContentsAt(active_index)->GetContentNativeView());
+}
+
+void SidebarContainerView::HideCustomContextMenu() {
+  if (context_menu_runner_)
+    context_menu_runner_->Cancel();
 }
 
 void SidebarContainerView::UpdateBackgroundAndBorder() {
@@ -174,8 +208,7 @@ bool SidebarContainerView::ShouldShowSidebar() const {
 void SidebarContainerView::OnMouseEntered(const ui::MouseEvent& event) {
   const auto show_option = GetSidebarService(browser_)->GetSidebarShowOption();
   const bool autohide_sidebar =
-      show_option == ShowSidebarOption::kShowOnMouseOver ||
-      show_option == ShowSidebarOption::kShowOnClick;
+      show_option == ShowSidebarOption::kShowOnMouseOver;
 
   // When user select to non-autohide option like "Never" option,
   // hide timer is scheduled but this view can get mouse event when context
@@ -195,8 +228,7 @@ void SidebarContainerView::OnMouseExited(const ui::MouseEvent& event) {
 
   const auto show_option = GetSidebarService(browser_)->GetSidebarShowOption();
   const bool autohide_sidebar =
-      show_option == ShowSidebarOption::kShowOnMouseOver ||
-      show_option == ShowSidebarOption::kShowOnClick;
+      show_option == ShowSidebarOption::kShowOnMouseOver;
 
   if (!autohide_sidebar)
     return;
@@ -244,11 +276,6 @@ void SidebarContainerView::ShowOptionsEventDetectWidget(bool show) {
 
 void SidebarContainerView::ShowSidebar() {
   ShowSidebar(true, false);
-}
-
-bool SidebarContainerView::ShouldShowOnHover() {
-  const auto show_option = GetSidebarService(browser_)->GetSidebarShowOption();
-  return show_option == ShowSidebarOption::kShowOnMouseOver;
 }
 
 void SidebarContainerView::ShowSidebar(bool show_sidebar,

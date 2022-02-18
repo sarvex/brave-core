@@ -5,12 +5,9 @@
 
 #include "brave/browser/ui/sidebar/sidebar_utils.h"
 
-#include "base/feature_list.h"
 #include "brave/browser/ui/sidebar/sidebar_service_factory.h"
-#include "brave/components/sidebar/features.h"
 #include "brave/components/sidebar/sidebar_item.h"
 #include "brave/components/sidebar/sidebar_service.h"
-#include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/search/search.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
@@ -53,15 +50,9 @@ bool IsActiveTabAlreadyAddedToSidebar(Browser* browser) {
 
 }  // namespace
 
-bool CanUseSidebar(Profile* profile) {
-  if (!base::FeatureList::IsEnabled(sidebar::kSidebarFeature))
-    return false;
-
-  if (!profile)
-    return false;
-
-  // Temporarily enable only normal profile.
-  return !profile->IsOffTheRecord();
+bool CanUseSidebar(Browser* browser) {
+  DCHECK(browser);
+  return browser->is_type_normal();
 }
 
 bool CanAddCurrentActiveTabToSidebar(Browser* browser) {

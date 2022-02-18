@@ -21,8 +21,10 @@ source_set("browser") {
     "api/bookmarks/exporter",
     "api/bookmarks/importer",
     "api/brave_wallet:wallet_mojom_wrappers",
+    "api/certificate",
     "api/history",
     "api/sync",
+    "api/version_info",
     "brave_wallet",
     "metrics",
     "//base",
@@ -45,4 +47,8 @@ source_set("browser") {
     "//ios/web/public/thread",
     "//ui/base",
   ]
+}
+
+group("chromium_src") {
+  deps = [ "//brave/common" ]
 }

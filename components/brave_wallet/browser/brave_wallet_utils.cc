@@ -32,10 +32,6 @@
 #include "third_party/boringssl/src/include/openssl/evp.h"
 #include "url/gurl.h"
 
-#if defined(OS_WIN)
-#include <windows.h>
-#endif
-
 namespace brave_wallet {
 
 namespace {
@@ -176,9 +172,7 @@ GURL GetCustomChainURL(PrefService* prefs, const std::string& chain_id) {
   for (const auto& it : custom_chains) {
     if (it->chain_id != chain_id)
       continue;
-    if (it->rpc_urls.empty())
-      return GURL();
-    return GURL(it->rpc_urls.front());
+    return GetFirstValidChainURL(it->rpc_urls);
   }
   return GURL();
 }
@@ -233,14 +227,37 @@ void GetAllCustomChains(PrefService* prefs,
   }
 }
 
+GURL GetFirstValidChainURL(const std::vector<std::string>& chain_urls) {
+  if (chain_urls.empty())
+    return GURL();
+  for (const std::string& spec : chain_urls) {
+    GURL url(spec);
+    if (spec.find("${INFURA_API_KEY}") == std::string::npos &&
+        spec.find("${ALCHEMY_API_KEY}") == std::string::npos &&
+        spec.find("${API_KEY}") == std::string::npos &&
+        spec.find("${PULSECHAIN_API_KEY}") == std::string::npos &&
+        url.SchemeIsHTTPOrHTTPS()) {
+      return url;
+    }
+  }
+  return GURL(chain_urls.front());
+}
+
 bool IsNativeWalletEnabled() {
   return base::FeatureList::IsEnabled(
       brave_wallet::features::kNativeBraveWalletFeature);
 }
+
 bool IsFilecoinEnabled() {
   return base::FeatureList::IsEnabled(
       brave_wallet::features::kBraveWalletFilecoinFeature);
 }
+
+bool IsSolanaEnabled() {
+  return base::FeatureList::IsEnabled(
+      brave_wallet::features::kBraveWalletSolanaFeature);
+}
+
 const std::vector<brave_wallet::mojom::EthereumChain>
 GetAllKnownNetworksForTesting() {
   std::vector<brave_wallet::mojom::EthereumChain> result;
@@ -462,20 +479,6 @@ bool DecodeStringArray(const std::string& input,
   }
 
   return true;
-}
-
-void SecureZeroData(void* data, size_t size) {
-  if (data == nullptr || size == 0)
-    return;
-#if defined(OS_WIN)
-  SecureZeroMemory(data, size);
-#else
-  // 'volatile' is required. Otherwise optimizers can remove this function
-  // if cleaning local variables, which are not used after that.
-  volatile uint8_t* d = (volatile uint8_t*)data;
-  for (size_t i = 0; i < size; i++)
-    d[i] = 0;
-#endif
 }
 
 // Updates preferences for when the wallet is unlocked.
@@ -702,7 +705,7 @@ void AddCustomNetwork(PrefService* prefs, mojom::EthereumChainPtr chain) {
 
   {  // Update needs to be done before GetNetworkId below.
     ListPrefUpdate update(prefs, kBraveWalletCustomNetworks);
-    base::ListValue* list = update.Get();
+    base::Value* list = update.Get();
     list->Append(std::move(value.value()));
   }
 
@@ -710,7 +713,7 @@ void AddCustomNetwork(PrefService* prefs, mojom::EthereumChainPtr chain) {
   DCHECK(!network_id.empty());  // Not possible for a custom network.
 
   DictionaryPrefUpdate update(prefs, kBraveWalletUserAssets);
-  base::DictionaryValue* user_assets_pref = update.Get();
+  base::Value* user_assets_pref = update.Get();
   base::Value* asset_list = user_assets_pref->SetKey(
       network_id, base::Value(base::Value::Type::LIST));
 
@@ -733,7 +736,7 @@ void RemoveCustomNetwork(PrefService* prefs,
   DCHECK(prefs);
 
   ListPrefUpdate update(prefs, kBraveWalletCustomNetworks);
-  base::ListValue* list = update.Get();
+  base::Value* list = update.Get();
   list->EraseListValueIf([&](const base::Value& v) {
     auto* chain_id_value = v.FindStringKey("chainId");
     if (!chain_id_value)

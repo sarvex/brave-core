@@ -31,8 +31,8 @@ export interface Props {
   onShowBackup: () => void
   onChangeTimeline: (path: BraveWallet.AssetPriceTimeframe) => void
   onSelectAsset: (asset: BraveWallet.BlockchainToken | undefined) => void
-  onCreateAccount: (name: string) => void
-  onImportAccount: (accountName: string, privateKey: string) => void
+  onCreateAccount: (name: string, coin: BraveWallet.CoinType) => void
+  onImportAccount: (accountName: string, privateKey: string, coin: BraveWallet.CoinType) => void
   onImportFilecoinAccount: (accountName: string, key: string, network: string, protocol: BraveWallet.FilecoinAddressProtocol) => void
   onConnectHardwareWallet: (opts: HardwareWalletConnectOpts) => Promise<BraveWallet.HardwareWalletAccount[]>
   onAddHardwareAccounts: (selected: BraveWallet.HardwareWalletAccount[]) => void
@@ -41,8 +41,8 @@ export interface Props {
   onShowAddModal: () => void
   onHideAddModal: () => void
   onSelectNetwork: (network: BraveWallet.EthereumChain) => void
-  onRemoveAccount: (address: string, hardware: boolean) => void
-  onViewPrivateKey: (address: string, isDefault: boolean) => void
+  onRemoveAccount: (address: string, hardware: boolean, coin: BraveWallet.CoinType) => void
+  onViewPrivateKey: (address: string, isDefault: boolean, coin: BraveWallet.CoinType) => void
   onDoneViewingPrivateKey: () => void
   onImportAccountFromJson: (accountName: string, password: string, json: string) => void
   onSetImportError: (error: boolean) => void
@@ -70,6 +70,8 @@ export interface Props {
   transactions: AccountTransactions
   userAssetList: UserAssetInfoType[]
   isLoading: boolean
+  isFilecoinEnabled: boolean
+  isSolanaEnabled: boolean
   showAddModal: boolean
   selectedNetwork: BraveWallet.EthereumChain
   isFetchingPortfolioPriceHistory: boolean
@@ -133,6 +135,8 @@ const CryptoView = (props: Props) => {
     transactions,
     selectedAssetFiatPrice,
     selectedAssetCryptoPrice,
+    isFilecoinEnabled,
+    isSolanaEnabled,
     isLoading,
     showAddModal,
     isFetchingPortfolioPriceHistory,
@@ -367,6 +371,8 @@ const CryptoView = (props: Props) => {
           onRouteBackToAccounts={onRouteBack}
           onCreateAccount={onCreateAccount}
           onImportAccount={onImportAccount}
+          isFilecoinEnabled={isFilecoinEnabled}
+          isSolanaEnabled={isSolanaEnabled}
           onImportFilecoinAccount={onImportFilecoinAccount}
           onConnectHardwareWallet={onConnectHardwareWallet}
           onAddHardwareAccounts={onAddHardwareAccounts}

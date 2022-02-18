@@ -24,7 +24,6 @@
 #include "brave/components/decentralized_dns/buildflags/buildflags.h"
 #include "brave/components/ipfs/buildflags/buildflags.h"
 #include "brave/components/ntp_background_images/browser/features.h"
-#include "brave/components/sidebar/buildflags/buildflags.h"
 #include "brave/components/skus/browser/skus_utils.h"
 #include "brave/components/skus/browser/switches.h"
 #include "brave/components/skus/common/features.h"
@@ -36,10 +35,6 @@
 
 #if BUILDFLAG(ENABLE_BRAVE_VPN) && !defined(OS_ANDROID)
 #include "brave/components/brave_vpn/features.h"
-#endif
-
-#if BUILDFLAG(ENABLE_SIDEBAR)
-#include "brave/components/sidebar/features.h"
 #endif
 
 #if BUILDFLAG(ENABLE_SPEEDREADER)
@@ -126,12 +121,6 @@ constexpr char kBraveDarkModeBlockName[] =
 constexpr char kBraveDarkModeBlockDescription[] =
     "Always report light mode when fingerprinting protections set to Strict";
 
-constexpr char kAdblockRedirectUrlName[] =
-    "Enable support for $redirect-url filter option for adblock rules";
-constexpr char kAdblockRedirectUrlDescription[] =
-    "Enable support for loading adblock replacement resources over the network "
-    "via the $redirect-url filter option";
-
 constexpr char kBraveDomainBlockName[] = "Enable domain blocking";
 constexpr char kBraveDomainBlockDescription[] =
     "Enable support for blocking domains with an interstitial page";
@@ -171,10 +160,6 @@ constexpr char kBraveNTPBrandedWallpaperDemoDescription[] =
     "Force dummy data for the Branded Wallpaper New Tab Page Experience. "
     "View rate and user opt-in conditionals will still be followed to decide "
     "when to display the Branded Wallpaper.";
-
-constexpr char kBraveSidebarName[] = "Enable Sidebar";
-// TODO(simon): Use better description.
-constexpr char kBraveSidebarDescription[] = "Enable Sidebar";
 
 constexpr char kBraveSpeedreaderName[] = "Enable SpeedReader";
 constexpr char kBraveSpeedreaderDescription[] =
@@ -262,6 +247,10 @@ constexpr char kBraveWalletFilecoinName[] =
     "Enable Brave Wallet Filecoin support";
 constexpr char kBraveWalletFilecoinDescription[] =
     "Filecoin support for native Brave Wallet";
+
+constexpr char kBraveWalletSolanaName[] = "Enable Brave Wallet Solana support";
+constexpr char kBraveWalletSolanaDescription[] =
+    "Solana support for native Brave Wallet";
 
 constexpr char kBraveNewsName[] = "Enable Brave News";
 constexpr char kBraveNewsDescription[] =
@@ -351,17 +340,6 @@ const flags_ui::FeatureEntry::Choice kBraveSkusEnvChoices[] = {
      kOsMac | kOsWin | kOsAndroid,                      \
      MULTI_VALUE_TYPE(flag_descriptions::kBraveSkusEnvChoices)},
 
-#if BUILDFLAG(ENABLE_SIDEBAR)
-#define SIDEBAR_FEATURE_ENTRIES                     \
-    {kBraveSidebarFeatureInternalName,              \
-     flag_descriptions::kBraveSidebarName,          \
-     flag_descriptions::kBraveSidebarDescription,   \
-     kOsMac | kOsWin | kOsLinux,                    \
-     FEATURE_VALUE_TYPE(sidebar::kSidebarFeature)},
-#else
-#define SIDEBAR_FEATURE_ENTRIES
-#endif
-
 #if BUILDFLAG(ENABLE_SPEEDREADER)
 #define SPEEDREADER_FEATURE_ENTRIES \
     {"brave-speedreader",                                               \
@@ -393,17 +371,22 @@ const flags_ui::FeatureEntry::Choice kBraveSkusEnvChoices[] = {
 #define BRAVE_IPFS_FEATURE_ENTRIES
 #endif
 
-#define BRAVE_NATIVE_WALLET_FEATURE_ENTRIES                                  \
-    {"native-brave-wallet",                                                  \
-     flag_descriptions::kNativeBraveWalletName,                              \
-     flag_descriptions::kNativeBraveWalletDescription,                       \
-     kOsDesktop | flags_ui::kOsAndroid,                                      \
-     FEATURE_VALUE_TYPE(brave_wallet::features::kNativeBraveWalletFeature)}, \
-    {"brave-wallet-filecoin",                                                \
-     flag_descriptions::kBraveWalletFilecoinName,                            \
-     flag_descriptions::kBraveWalletFilecoinDescription,                     \
-     kOsDesktop | flags_ui::kOsAndroid,                                      \
-     FEATURE_VALUE_TYPE(brave_wallet::features::kBraveWalletFilecoinFeature)},
+#define BRAVE_NATIVE_WALLET_FEATURE_ENTRIES                                    \
+    {"native-brave-wallet",                                                    \
+     flag_descriptions::kNativeBraveWalletName,                                \
+     flag_descriptions::kNativeBraveWalletDescription,                         \
+     kOsDesktop | flags_ui::kOsAndroid,                                        \
+     FEATURE_VALUE_TYPE(brave_wallet::features::kNativeBraveWalletFeature)},   \
+    {"brave-wallet-filecoin",                                                  \
+     flag_descriptions::kBraveWalletFilecoinName,                              \
+     flag_descriptions::kBraveWalletFilecoinDescription,                       \
+     kOsDesktop | flags_ui::kOsAndroid,                                        \
+     FEATURE_VALUE_TYPE(brave_wallet::features::kBraveWalletFilecoinFeature)}, \
+    {"brave-wallet-solana",                                                    \
+     flag_descriptions::kBraveWalletSolanaName,                                \
+     flag_descriptions::kBraveWalletSolanaDescription,                         \
+     kOsDesktop | flags_ui::kOsAndroid,                                        \
+     FEATURE_VALUE_TYPE(brave_wallet::features::kBraveWalletSolanaFeature)},
 
 #define BRAVE_NEWS_FEATURE_ENTRIES                                  \
     {"brave-news",                                                  \
@@ -494,10 +477,6 @@ const flags_ui::FeatureEntry::Choice kBraveSkusEnvChoices[] = {
      flag_descriptions::kBraveDarkModeBlockName,                            \
      flag_descriptions::kBraveDarkModeBlockDescription, kOsAll,             \
      FEATURE_VALUE_TYPE(kBraveDarkModeBlock)},                              \
-    {"brave-adblock-redirect-url",                                          \
-     flag_descriptions::kAdblockRedirectUrlName,                            \
-     flag_descriptions::kAdblockRedirectUrlDescription, kOsAll,             \
-     FEATURE_VALUE_TYPE(net::features::kAdblockRedirectUrl)},               \
     {"brave-domain-block",                                                  \
      flag_descriptions::kBraveDomainBlockName,                              \
      flag_descriptions::kBraveDomainBlockDescription, kOsAll,               \
@@ -585,7 +564,6 @@ const flags_ui::FeatureEntry::Choice kBraveSkusEnvChoices[] = {
     BRAVE_REWARDS_GEMINI_FEATURE_ENTRIES                                    \
     BRAVE_VPN_FEATURE_ENTRIES                                               \
     BRAVE_SKU_SDK_FEATURE_ENTRIES                                           \
-    SIDEBAR_FEATURE_ENTRIES                                                 \
     SPEEDREADER_FEATURE_ENTRIES                                             \
     BRAVE_SHIELDS_V2_FEATURE_ENTRIES                                        \
     BRAVE_TRANSLATE_GO_FEATURE_ENTRIES
