@@ -2,15 +2,29 @@ import {addWebUIListener} from 'chrome://resources/js/cr.m.js';
 import {decorate} from 'chrome://resources/js/cr/ui.m.js';
 import {TabBox} from 'chrome://resources/js/cr/ui/tabs.js';
 import {loadTimeData} from 'chrome://resources/js/load_time_data.m.js';
+
 import {$} from 'chrome://resources/js/util.m.js';
+
+import {AdStoreLog} from './segmentation_internals.mojom-webui.js';
+import {FederatedInternalsBrowserProxy} from './segmentation_internals_browser_proxy.js';
+
+function getProxy(): FederatedInternalsBrowserProxy {
+  return FederatedInternalsBrowserProxy.getInstance();
+}
 
 const dataStoresLogs = {};
 let selectedDataStore = "ad-timing";
 
 function initialize() {
-  addMessageHandlers();
   decorate('tabbox', TabBox);
-  chrome.send('requestAdStoreInfo');
+
+  getProxy().getAdStoreInfo();
+  
+  getProxy().getCallbackRouter().onAdsTimingDataStoreLogsLoaded.addListener(
+    (ad_store_logs: Array<AdStoreLog>) => {
+      dataStoresLogs['ad-timing'] = logs;
+      onDataStoreChanged();
+  });
 
   const button = $('data-store-logs-dump');
   button.addEventListener('click', onLogsDump);
@@ -51,15 +65,6 @@ function initialize() {
   activateTabByHash();
 }
 
-function addMessageHandlers() {
-  addWebUIListener('adsTimingDataStoreLogsLoaded', onAdsTimingDataStoreLogsLoaded);
-}
-
-function onAdsTimingDataStoreLogsLoaded(logs) {
-    dataStoresLogs['ad-timing'] = logs;
-    onDataStoreChanged();
-}
-
 function onDataStoreChanged() {
     selectedDataStore = $('stores').value;
     const logs = dataStoresLogs[selectedDataStore]; 
@@ -76,11 +81,11 @@ function onDataStoreChanged() {
     
       logs.forEach(function(log) {
         const tr = document.createElement('tr');
-        appendTD(tr, log['id'], 'ad-timing-log-id');
-        appendTD(tr, formatDate(new Date(log['time'])), 'ad-timing-log-time');
-        appendTD(tr, log['locale'], 'ad-timing-log-locale');
-        appendTD(tr, log['number_of_tabs'], 'ad-timing-log-number_of_tabs');
-        appendBooleanTD(tr, log['label'], 'ad-timing-log-label');
+        appendTD(tr, log.log_id, 'ad-timing-log-id');
+        appendTD(tr, formatDate(new Date(log.log_time)), 'ad-timing-log-time');
+        appendTD(tr, log.log_locale, 'ad-timing-log-locale');
+        appendTD(tr, log.log_number_of_tabs, 'ad-timing-log-number_of_tabs');
+        appendBooleanTD(tr, log.log_label, 'ad-timing-log-label');
     
         const tabpanel = $('tabpanel-data-store-logs');
         const tbody = tabpanel.getElementsByTagName('tbody')[0];

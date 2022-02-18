@@ -14,7 +14,7 @@
 #include "brave/browser/ui/webui/brave_rewards_internals_ui.h"
 #include "brave/browser/ui/webui/brave_rewards_page_ui.h"
 #include "brave/browser/ui/webui/brave_tip_ui.h"
-#include "brave/browser/ui/webui/federated_learning_internals_ui.h"
+#include "brave/browser/ui/webui/brave_federated/federated_internals_ui.h"
 #include "brave/browser/ui/webui/webcompat_reporter_ui.h"
 #include "brave/common/brave_features.h"
 #include "brave/common/pref_names.h"
@@ -142,10 +142,10 @@ WebUIController* NewWebUI(WebUI* web_ui, const GURL& url) {
              base::FeatureList::IsEnabled(sidebar::kSidebarFeature)) {
     return new SidebarBookmarksUI(web_ui);
 #endif
-  } else if (host == kFederatedLearningInternalsHost) {
+  } else if (host == kFederatedInternalsHost) {
     if (base::FeatureList::IsEnabled(
             brave_federated::features::kFederatedLearning)) {
-      return new FederatedLearningInternalsUI(web_ui, url.host());
+      return new FederatedInternalsUI(web_ui);
     }
   }
   return nullptr;
@@ -179,7 +179,7 @@ WebUIFactoryFunction GetWebUIFactoryFunction(WebUI* web_ui,
       url.host_piece() == kWalletPageHost ||
 #endif
       url.host_piece() == kRewardsPageHost ||
-      url.host_piece() == kFederatedLearningInternalsHost ||
+      url.host_piece() == kFederatedInternalsHost ||
       url.host_piece() == kRewardsInternalsHost ||
       url.host_piece() == kTipHost ||
 #if BUILDFLAG(ENABLE_TOR)

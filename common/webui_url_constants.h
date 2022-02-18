@@ -40,7 +40,7 @@ extern const char kUntrustedTrezorURL[];
 extern const char kShieldsPanelURL[];
 extern const char kShieldsPanelHost[];
 extern const char kSidebarBookmarksHost[];
-extern const char kFederatedLearningInternalsURL[];
-extern const char kFederatedLearningInternalsHost[];
+extern const char kFederatedInternalsURL[];
+extern const char kFederatedInternalsHost[];
 
 #endif  // BRAVE_COMMON_WEBUI_URL_CONSTANTS_H_
