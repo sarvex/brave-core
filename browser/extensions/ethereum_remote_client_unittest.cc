@@ -6,7 +6,8 @@
 #include "brave/browser/ethereum_remote_client/ethereum_remote_client_service.h"
 
 #include <array>
-
+#include "base/test/bind.h"
+#include "brave/browser/ethereum_remote_client/ethereum_remote_client_delegate.h"
 #include "brave/browser/ethereum_remote_client/pref_names.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/test/base/testing_browser_process.h"
@@ -15,6 +16,15 @@
 #include "content/public/test/browser_task_environment.h"
 #include "extensions/buildflags/buildflags.h"
 #include "testing/gtest/include/gtest/gtest.h"
+
+class MockEthereumRemoteClientDelegateImpl
+    : public EthereumRemoteClientDelegate {
+ public:
+  void MaybeLoadCryptoWalletsExtension(
+      content::BrowserContext* context) override {}
+  void UnloadCryptoWalletsExtension(content::BrowserContext* context) override {
+  }
+};
 
 class BraveWalletUnitTest : public testing::Test {
  public:
@@ -153,4 +163,19 @@ TEST_F(BraveWalletUnitTest, TestSaveToPrefs) {
   ASSERT_EQ(GetPrefs()->GetString(kERCAES256GCMSivNonce), "yJngKDr5nCGYz7EM");
   ASSERT_EQ(GetPrefs()->GetString(kERCEncryptedSeed),
             "IQu5fUMbXG6E7v8ITwcIKL3TI3rst0LU1US7ZxCKpgAGgLNAN6DbCN7nMF2Eg7Kx");
+}
+
+TEST_F(BraveWalletUnitTest, MaybeLoadCryptoWalletsExtension) {
+  auto* profile = ProfileManager::GetActiveUserProfile();
+  std::unique_ptr<EthereumRemoteClientService> service(
+      new EthereumRemoteClientService(
+          profile, std::make_unique<MockEthereumRemoteClientDelegateImpl>()));
+  base::RunLoop loop;
+  bool callback_called = false;
+  service->MaybeLoadCryptoWalletsExtension(
+      base::BindLambdaForTesting([&]() { callback_called = true; }));
+  ASSERT_TRUE(service->load_ui_callback_);
+  service->MaybeLoadCryptoWalletsExtension(base::DoNothing());
+  std::move(service->load_ui_callback_).Run();
+  ASSERT_TRUE(callback_called);
 }

@@ -74,6 +74,9 @@ class EthereumRemoteClientService
   static const size_t kSeedByteLength;
 
  private:
+  FRIEND_TEST_ALL_PREFIXES(BraveWalletUnitTest,
+                           MaybeLoadCryptoWalletsExtension);
+
   bool LoadRootSeedInfo(std::vector<uint8_t> key, std::string* seed);
 
   raw_ptr<content::BrowserContext> context_ = nullptr;
