@@ -5,25 +5,19 @@
 
 #include "bat/ads/internal/federated/covariate_logs.h"
 
-#include <string>
 #include <utility>
 
 #include "bat/ads/internal/logging.h"
 
 #include "base/check.h"
-#include "base/json/json_writer.h"
-#include "base/values.h"
 #include "bat/ads/internal/federated/covariate_log_entry.h"
-#include "bat/ads/internal/federated/covariate_logs_util.h"
 #include "bat/ads/internal/federated/log_entries/locale_country_at_time_of_serving_covariate_log_entry.h"
 #include "bat/ads/internal/federated/log_entries/number_of_tabs_opened_in_past_30_minutes.h"
 
 namespace ads {
 
 namespace {
-
 CovariateLogs* g_covariate_logs = nullptr;
-
 }  // namespace
 
 CovariateLogs::CovariateLogs() {
@@ -55,8 +49,8 @@ void CovariateLogs::SetCovariateLogEntry(
 
 mojom::TrainingInstancePtr CovariateLogs::GetTrainingInstance() const {
   mojom::TrainingInstancePtr instance = mojom::TrainingInstance::New();
-  for (const auto& entry_pair : covariate_log_entries_) {
-    CovariateLogEntry* entry = entry_pair.second.get();
+  for (const auto& covariate_log_entry_ : covariate_log_entries_) {
+    CovariateLogEntry* entry = covariate_log_entry_.second.get();
 
     mojom::CovariatePtr covariate = mojom::Covariate::New();
     covariate->data_type = entry->GetDataType();

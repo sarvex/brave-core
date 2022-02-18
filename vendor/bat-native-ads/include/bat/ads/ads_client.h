@@ -123,7 +123,7 @@ class ADS_EXPORT AdsClient {
                               const std::string& value) = 0;
 
   // Add federated log
-  virtual void LogTrainingInstance(
+  virtual void LogTrainingCovariates(
       const mojom::TrainingInstancePtr instance) = 0;
 
   // Log diagnostic information

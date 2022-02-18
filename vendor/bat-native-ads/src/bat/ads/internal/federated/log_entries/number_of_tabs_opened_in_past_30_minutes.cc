@@ -10,23 +10,11 @@
 #include "bat/ads/ads_client.h"
 #include "bat/ads/internal/ads_client_helper.h"
 #include "bat/ads/internal/federated/covariate_logs_util.h"
+#include "bat/ads/internal/federated/log_entries/number_of_tabs_opened_util.h"
 #include "bat/ads/internal/user_activity/user_activity.h"
 #include "bat/ads/pref_names.h"
 
 namespace ads {
-
-namespace {
-
-int64_t ComputeTabsOpened(const UserActivityEventList& events) {
-  const int64_t count = std::count_if(
-      events.cbegin(), events.cend(), [](const UserActivityEventInfo& event) {
-        return event.type == UserActivityEventType::kOpenedNewTab;
-      });
-
-  return count;
-}
-
-}  // namespace
 
 NumberOfTabsOpenedInPast30Minutes::NumberOfTabsOpenedInPast30Minutes() =
     default;
@@ -40,14 +28,14 @@ mojom::DataType NumberOfTabsOpenedInPast30Minutes::GetDataType() const {
 
 mojom::CovariateType NumberOfTabsOpenedInPast30Minutes::GetCovariateType()
     const {
-  return mojom::CovariateType::kNumberOfTabsOpenedInPast30Minutes;
+  return mojom::CovariateType::kAdNotificationNumberOfTabsOpenedInPast30Minutes;
 }
 
 std::string NumberOfTabsOpenedInPast30Minutes::GetValue() const {
   const UserActivityEventList events =
       UserActivity::Get()->GetHistoryForTimeWindow(base::Minutes(30));
 
-  return ToString(ComputeTabsOpened(events));
+  return ToString(GetNumberOfTabsOpened(events));
 }
 
 }  // namespace ads

@@ -196,9 +196,9 @@ void AdsClientMojoBridge::RecordP2AEvent(const std::string& name,
   ads_client_->RecordP2AEvent(name, type, out_value);
 }
 
-void AdsClientMojoBridge::LogTrainingInstance(
+void AdsClientMojoBridge::LogTrainingCovariates(
     ads::mojom::TrainingInstancePtr instance) {
-  ads_client_->LogTrainingInstance(std::move(instance));
+  ads_client_->LogTrainingCovariates(std::move(instance));
 }
 
 // static

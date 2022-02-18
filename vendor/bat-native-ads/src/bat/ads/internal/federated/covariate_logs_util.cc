@@ -8,19 +8,28 @@
 #include "base/strings/string_number_conversions.h"
 #include "base/time/time.h"
 
+namespace {
+
+constexpr char kTrue[] = "true";
+constexpr char kFalse[] = "false";
+
+}
+
 namespace ads {
 
-std::string ToString(const int64_t value) {
+std::string ToString(const int value) {
   return base::NumberToString(value);
 }
 
 std::string ToString(const bool value) {
-  return value ? "true" : "false";
+  return value ? kTrue : kFalse;
 }
 
 std::string ToString(const base::Time& time) {
-  if (time.is_null())
-    return {};
+  if (time.is_null()) {
+    return "";
+  }
+
   return base::NumberToString(time.ToDoubleT());
 }
 

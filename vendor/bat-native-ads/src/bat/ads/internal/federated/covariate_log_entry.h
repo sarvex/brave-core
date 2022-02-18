@@ -20,8 +20,6 @@ class CovariateLogEntry {
   virtual mojom::DataType GetDataType() const = 0;
   virtual mojom::CovariateType GetCovariateType() const = 0;
   virtual std::string GetValue() const = 0;
-
-  // TODO(Moritz Haller): move ads.mojom to federated.mojom and import
 };
 
 }  // namespace ads

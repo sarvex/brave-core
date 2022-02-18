@@ -47,7 +47,7 @@ class BraveFederatedService : public KeyedService {
 
   void Start();
 
-  DataStoreService* GetDataStoreService();
+  DataStoreService* GetDataStoreService() const;
 
  private:
   void InitPrefChangeRegistrar();

@@ -143,10 +143,10 @@ struct DBCommandResponse {
 };
 
 enum CovariateType {
-  kAdNotificationClicked,
-  kLocaleCountryAtTimeOfServing,
-  kImpressionServedAt,
-  kNumberOfTabsOpenedInPast30Minutes
+  kAdNotificationWasClicked,
+  kAdNotificationLocaleCountryAtTimeOfServing,
+  kAdNotificationImpressionServedAt,
+  kAdNotificationNumberOfTabsOpenedInPast30Minutes
 };
 
 enum DataType {

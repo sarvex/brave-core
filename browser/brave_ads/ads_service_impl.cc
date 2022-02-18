@@ -121,6 +121,9 @@ namespace brave_ads {
 
 namespace {
 
+constexpr char kTrue[] = "true";
+constexpr char kFalse[] = "false";
+
 const unsigned int kRetriesCountOnNetworkChange = 1;
 
 constexpr char kAdNotificationUrlPrefix[] = "https://www.brave.com/ads/?";
@@ -2103,37 +2106,37 @@ void AdsServiceImpl::RecordP2AEvent(const std::string& name,
   }
 }
 
-void AdsServiceImpl::LogTrainingInstance(
+void AdsServiceImpl::LogTrainingCovariates(
     const ads::mojom::TrainingInstancePtr instance) {
   if (!ad_notification_timing_data_store_) {
     return;
   }
 
-  // TODO(Moritz Haller): add dev concern ticket to refactor federated DB to
-  // store generic types
+  // TODO(https://github.com/brave/brave-browser/issues/21189): Refactor DB to
+  // use generic key/value schema across all data stores
   brave_federated::AdNotificationTimingTaskLog log;
 
   for (const auto& covariate : instance->covariates) {
     switch (covariate->covariate_type) {
-      case ads::mojom::CovariateType::kAdNotificationClicked: {
+      case ads::mojom::CovariateType::kAdNotificationWasClicked: {
         if (covariate->data_type != ads::mojom::DataType::kBool) {
           VLOG(0) << "covariate type not of type bool";
           break;
         }
 
         bool value_as_bool = false;
-        if (covariate->value == "true") {
+        if (covariate->value == kTrue) {
           value_as_bool = true;
-        } else if (covariate->value != "false") {
-          VLOG(0) << "Failed to convert covariate value to bool";
-          return;
+        } else if (covariate->value != kFalse) {
+          NOTREACHED() << "Failed to convert covariate value to bool";
+          continue;
         }
 
         log.label = value_as_bool;
         break;
       }
 
-      case ads::mojom::CovariateType::kLocaleCountryAtTimeOfServing: {
+      case ads::mojom::CovariateType::kAdNotificationLocaleCountryAtTimeOfServing: {
         if (covariate->data_type != ads::mojom::DataType::kString) {
           VLOG(0) << "covariate type not of type string";
           break;
@@ -2143,7 +2146,7 @@ void AdsServiceImpl::LogTrainingInstance(
         break;
       }
 
-      case ads::mojom::CovariateType::kImpressionServedAt: {
+      case ads::mojom::CovariateType::kAdNotificationImpressionServedAt: {
         if (covariate->data_type != ads::mojom::DataType::kDouble) {
           VLOG(0) << "covariate type not of type double";
           break;
@@ -2151,15 +2154,15 @@ void AdsServiceImpl::LogTrainingInstance(
 
         double value_as_double = 0.0;
         if (!base::StringToDouble(covariate->value, &value_as_double)) {
-          VLOG(0) << "Failed to convert covariate value to double";
-          return;
+          NOTREACHED() << "Failed to convert covariate value to double";
+          continue;
         }
 
         log.time = base::Time::FromDoubleT(value_as_double);
         break;
       }
 
-      case ads::mojom::CovariateType::kNumberOfTabsOpenedInPast30Minutes: {
+      case ads::mojom::CovariateType::kAdNotificationNumberOfTabsOpenedInPast30Minutes: {
         if (covariate->data_type != ads::mojom::DataType::kInt64) {
           VLOG(0) << "covariate type not of type int64";
           break;
@@ -2167,8 +2170,8 @@ void AdsServiceImpl::LogTrainingInstance(
 
         int64_t value_as_int64 = 0;
         if (!base::StringToInt64(covariate->value, &value_as_int64)) {
-          VLOG(0) << "Failed to convert covariate value to int64";
-          return;
+          NOTREACHED() << "Failed to convert covariate value to int64";
+          continue;
         }
 
         log.number_of_tabs = value_as_int64;
@@ -2180,14 +2183,17 @@ void AdsServiceImpl::LogTrainingInstance(
   ad_notification_timing_data_store_
       ->AsyncCall(&brave_federated::AdNotificationTimingDataStore::AddLog)
       .WithArgs(log)
-      .Then(base::BindOnce(&AdsServiceImpl::OnLogTrainingInstance,
+      .Then(base::BindOnce(&AdsServiceImpl::OnLogTrainingCovariates,
                            base::Unretained(this)));
 }
 
-void AdsServiceImpl::OnLogTrainingInstance(bool success) {
+void AdsServiceImpl::OnLogTrainingCovariates(bool success) {
   if (!success) {
-    VLOG(1) << "Failed to log training instance";
+    VLOG(1) << "Failed to log training covariates";
+    return;
   }
+
+  VLOG(1) << "Successfully logged training covariates";
 }
 
 void AdsServiceImpl::Load(const std::string& name, ads::LoadCallback callback) {

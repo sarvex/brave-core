@@ -811,7 +811,7 @@ void AdsImpl::OnAdNotificationViewed(const AdNotificationInfo& ad) {
 
   auto impression_served_at_covariate_log_entry =
       std::make_unique<ImpressionServedAtCovariateLogEntry>();
-  impression_served_at_covariate_log_entry->SetLastImpressionTimestamp(
+  impression_served_at_covariate_log_entry->SetLastImpressionAt(
       base::Time::Now());
   CovariateLogs::Get()->SetCovariateLogEntry(
       std::move(impression_served_at_covariate_log_entry));
@@ -834,7 +834,7 @@ void AdsImpl::OnAdNotificationClicked(const AdNotificationInfo& ad) {
 
   mojom::TrainingInstancePtr instance =
       CovariateLogs::Get()->GetTrainingInstance();
-  AdsClientHelper::Get()->LogTrainingInstance(std::move(instance));
+  AdsClientHelper::Get()->LogTrainingCovariates(std::move(instance));
 }
 
 void AdsImpl::OnAdNotificationDismissed(const AdNotificationInfo& ad) {
@@ -852,7 +852,7 @@ void AdsImpl::OnAdNotificationDismissed(const AdNotificationInfo& ad) {
 
   mojom::TrainingInstancePtr instance =
       CovariateLogs::Get()->GetTrainingInstance();
-  AdsClientHelper::Get()->LogTrainingInstance(std::move(instance));
+  AdsClientHelper::Get()->LogTrainingCovariates(std::move(instance));
 }
 
 void AdsImpl::OnAdNotificationTimedOut(const AdNotificationInfo& ad) {
@@ -867,7 +867,7 @@ void AdsImpl::OnAdNotificationTimedOut(const AdNotificationInfo& ad) {
 
   mojom::TrainingInstancePtr instance =
       CovariateLogs::Get()->GetTrainingInstance();
-  AdsClientHelper::Get()->LogTrainingInstance(std::move(instance));
+  AdsClientHelper::Get()->LogTrainingCovariates(std::move(instance));
 }
 
 void AdsImpl::OnAdNotificationEventFailed(

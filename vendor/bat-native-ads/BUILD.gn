@@ -662,6 +662,8 @@ source_set("ads") {
     "src/bat/ads/internal/federated/log_entries/locale_country_at_time_of_serving_covariate_log_entry.h",
     "src/bat/ads/internal/federated/log_entries/number_of_tabs_opened_in_past_30_minutes.cc",
     "src/bat/ads/internal/federated/log_entries/number_of_tabs_opened_in_past_30_minutes.h",
+    "src/bat/ads/internal/federated/log_entries/number_of_tabs_opened_util.cc",
+    "src/bat/ads/internal/federated/log_entries/number_of_tabs_opened_util.h",
     "src/bat/ads/internal/frequency_capping/exclusion_rules/anti_targeting_exclusion_rule.cc",
     "src/bat/ads/internal/frequency_capping/exclusion_rules/anti_targeting_exclusion_rule.h",
     "src/bat/ads/internal/frequency_capping/exclusion_rules/conversion_exclusion_rule.cc",

@@ -5,11 +5,6 @@
 
 #include "bat/ads/internal/federated/log_entries/locale_country_at_time_of_serving_covariate_log_entry.h"
 
-#include <cstdint>
-
-#include "bat/ads/ads_client.h"
-#include "bat/ads/internal/federated/covariate_logs_util.h"
-#include "bat/ads/pref_names.h"
 #include "brave/components/l10n/browser/locale_helper.h"
 #include "brave/components/l10n/common/locale_util.h"
 
@@ -28,14 +23,12 @@ mojom::DataType LocaleCountryAtTimeOfServingCovariateLogEntry::GetDataType()
 
 mojom::CovariateType
 LocaleCountryAtTimeOfServingCovariateLogEntry::GetCovariateType() const {
-  return mojom::CovariateType::kLocaleCountryAtTimeOfServing;
+  return mojom::CovariateType::kAdNotificationLocaleCountryAtTimeOfServing;
 }
 
 std::string LocaleCountryAtTimeOfServingCovariateLogEntry::GetValue() const {
-  const auto locale = brave_l10n::LocaleHelper::GetInstance()->GetLocale();
-  const auto country_code = brave_l10n::GetCountryCode(locale);
-
-  return country_code;
+  const std::string locale = brave_l10n::LocaleHelper::GetInstance()->GetLocale();
+  return brave_l10n::GetCountryCode(locale);
 }
 
 }  // namespace ads

@@ -63,7 +63,7 @@ void BraveFederatedService::Start() {
   }
 }
 
-DataStoreService* BraveFederatedService::GetDataStoreService() {
+DataStoreService* BraveFederatedService::GetDataStoreService() const {
   DCHECK(data_store_service_);
   return data_store_service_.get();
 }

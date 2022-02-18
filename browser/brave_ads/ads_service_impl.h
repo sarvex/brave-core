@@ -418,9 +418,9 @@ class AdsServiceImpl : public AdsService,
                       const ads::mojom::P2AEventType type,
                       const std::string& value) override;
 
-  void LogTrainingInstance(
+  void LogTrainingCovariates(
       const ads::mojom::TrainingInstancePtr instance) override;
-  void OnLogTrainingInstance(bool success);
+  void OnLogTrainingCovariates(bool success);
 
   void WriteDiagnosticLog(const std::string& file,
                           const int line,
@@ -510,7 +510,7 @@ class AdsServiceImpl : public AdsService,
       nullptr};  // NOT OWNED
 
   raw_ptr<base::SequenceBound<brave_federated::AdNotificationTimingDataStore>>
-      ad_notification_timing_data_store_;  // NOT OWNED
+      ad_notification_timing_data_store_ = nullptr;  // NOT OWNED
 
   mojo::AssociatedReceiver<bat_ads::mojom::BatAdsClient>
       bat_ads_client_receiver_;

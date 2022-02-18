@@ -8,8 +8,11 @@
 
 #include <string>
 
-#include "base/time/time.h"
 #include "bat/ads/internal/federated/covariate_log_entry.h"
+
+namespace base {
+class Time;
+}  // namespace base
 
 namespace ads {
 
@@ -22,7 +25,7 @@ class ImpressionServedAtCovariateLogEntry final : public CovariateLogEntry {
       const ImpressionServedAtCovariateLogEntry&) = delete;
   ~ImpressionServedAtCovariateLogEntry() override;
 
-  void SetLastImpressionTimestamp(const base::Time& time);
+  void SetLastImpressionAt(const base::Time& time);
 
   // CovariateLogEntry
   mojom::DataType GetDataType() const override;
@@ -30,7 +33,7 @@ class ImpressionServedAtCovariateLogEntry final : public CovariateLogEntry {
   std::string GetValue() const override;
 
  private:
-  base::Time impression_served_at_timestamp_;
+  base::Time impression_served_at_;
 };
 
 }  // namespace ads

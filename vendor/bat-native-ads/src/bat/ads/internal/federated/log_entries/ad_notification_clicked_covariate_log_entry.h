@@ -29,7 +29,7 @@ class AdNotificationClickedCovariateLogEntry final : public CovariateLogEntry {
   std::string GetValue() const override;
 
  private:
-  bool clicked_;
+  bool was_clicked_ = false;
 };
 
 }  // namespace ads

@@ -5,6 +5,7 @@
 
 #include "bat/ads/internal/federated/log_entries/impression_served_at_covariate_log_entry.h"
 
+#include "base/time/time.h"
 #include "bat/ads/internal/federated/covariate_logs_util.h"
 
 namespace ads {
@@ -15,9 +16,9 @@ ImpressionServedAtCovariateLogEntry::ImpressionServedAtCovariateLogEntry() =
 ImpressionServedAtCovariateLogEntry::~ImpressionServedAtCovariateLogEntry() =
     default;
 
-void ImpressionServedAtCovariateLogEntry::SetLastImpressionTimestamp(
+void ImpressionServedAtCovariateLogEntry::SetLastImpressionAt(
     const base::Time& time) {
-  impression_served_at_timestamp_ = time;
+  impression_served_at_ = time;
 }
 
 mojom::DataType ImpressionServedAtCovariateLogEntry::GetDataType() const {
@@ -26,11 +27,11 @@ mojom::DataType ImpressionServedAtCovariateLogEntry::GetDataType() const {
 
 mojom::CovariateType ImpressionServedAtCovariateLogEntry::GetCovariateType()
     const {
-  return mojom::CovariateType::kImpressionServedAt;
+  return mojom::CovariateType::kAdNotificationImpressionServedAt;
 }
 
 std::string ImpressionServedAtCovariateLogEntry::GetValue() const {
-  return ToString(impression_served_at_timestamp_);
+  return ToString(impression_served_at_);
 }
 
 }  // namespace ads

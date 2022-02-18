@@ -5,13 +5,8 @@
 
 #include "bat/ads/internal/federated/log_entries/ad_notification_clicked_covariate_log_entry.h"
 
-#include <cstdint>
-
-#include "bat/ads/ads_client.h"
 #include "bat/ads/internal/federated/covariate_logs_util.h"
-#include "bat/ads/pref_names.h"
 #include "brave/components/l10n/browser/locale_helper.h"
-#include "brave/components/l10n/common/locale_util.h"
 
 namespace ads {
 
@@ -22,7 +17,7 @@ AdNotificationClickedCovariateLogEntry::
     ~AdNotificationClickedCovariateLogEntry() = default;
 
 void AdNotificationClickedCovariateLogEntry::SetClicked(const bool clicked) {
-  clicked_ = clicked;
+  was_clicked_ = clicked;
 }
 
 mojom::DataType AdNotificationClickedCovariateLogEntry::GetDataType() const {
@@ -31,11 +26,11 @@ mojom::DataType AdNotificationClickedCovariateLogEntry::GetDataType() const {
 
 mojom::CovariateType AdNotificationClickedCovariateLogEntry::GetCovariateType()
     const {
-  return mojom::CovariateType::kAdNotificationClicked;
+  return mojom::CovariateType::kAdNotificationWasClicked;
 }
 
 std::string AdNotificationClickedCovariateLogEntry::GetValue() const {
-  return ToString(clicked_);
+  return ToString(was_clicked_);
 }
 
 }  // namespace ads
