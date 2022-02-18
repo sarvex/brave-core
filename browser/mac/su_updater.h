@@ -6,8 +6,6 @@
 #ifndef BRAVE_BROWSER_MAC_SU_UPDATER_H_
 #define BRAVE_BROWSER_MAC_SU_UPDATER_H_
 
-#if defined(__OBJC__)
-
 #import <Foundation/Foundation.h>
 
 @interface SUUpdateDriver;
@@ -19,9 +17,9 @@
 
 @interface SUUpdater : NSObject
 
-@property (strong) SUUpdateDriver *driver;
+@property(strong) SUUpdateDriver* driver;  // NOLINT
 
-+ (SUUpdater *)sharedUpdater;
++ (SUUpdater*)sharedUpdater;  // NOLINT
 
 - (void)checkForUpdates:(id)sender;
 - (void)setDelegate:(id)delegate;
@@ -34,7 +32,5 @@
 @property BOOL automaticallyDownloadsUpdates;
 
 @end
-
-#endif  // __OBJC__
 
 #endif  // BRAVE_BROWSER_MAC_SU_UPDATER_H_
