@@ -32,6 +32,7 @@
 #include "brave/components/brave_rewards/browser/rewards_service_private_observer.h"
 #include "brave/components/greaselion/browser/buildflags/buildflags.h"
 #include "brave/components/services/bat_ledger/public/interfaces/bat_ledger.mojom.h"
+#include "brave/components/sync/protocol/vg_specifics.pb.h"
 #include "chrome/browser/bitmap_fetcher/bitmap_fetcher_service.h"
 #include "components/prefs/pref_change_registrar.h"
 #include "content/public/browser/browser_thread.h"
@@ -782,7 +783,7 @@ class RewardsServiceImpl : public RewardsService,
 
   void OnBackUpVGSpendStatuses(
       ledger::type::Result result,
-      std::vector<ledger::type::VirtualGrantSpendStatusPtr> vg_spend_statuses);
+      const std::vector<sync_pb::VgSpendStatusSpecifics>& vg_spend_statuses);
 
   //void OnGetPairs(RestoreVGsCallback callback,
   //                std::vector<bat_ledger::mojom::PairPtr> pairs);

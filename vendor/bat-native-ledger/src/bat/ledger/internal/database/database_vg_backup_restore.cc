@@ -189,18 +189,17 @@ void DatabaseVGBackupRestore::OnBackUpVGSpendStatuses(
     return std::move(callback).Run(type::Result::IN_PROGRESS, {});
   }
 
-  std::vector<type::VirtualGrantSpendStatusPtr> vg_spend_statuses;
+  std::vector<sync_pb::VgSpendStatusSpecifics> vg_spend_statuses;
 
   for (const auto& record : records) {
     auto* record_pointer = record.get();
 
-    auto token = type::VirtualGrantSpendStatus::New();
-    token->token_id = GetInt64Column(record_pointer, 0);
-    token->redeemed_at = GetInt64Column(record_pointer, 1);
-    token->redeem_type =
-        static_cast<type::RewardsType>(GetInt64Column(record_pointer, 2));
+    sync_pb::VgSpendStatusSpecifics vg_spend_status;
+    vg_spend_status.set_token_id(GetInt64Column(record_pointer, 0));
+    vg_spend_status.set_redeemed_at(GetInt64Column(record_pointer, 1));
+    vg_spend_status.set_redeem_type(GetInt64Column(record_pointer, 2));
 
-    vg_spend_statuses.emplace_back(std::move(token));
+    vg_spend_statuses.emplace_back(std::move(vg_spend_status));
   }
 
   std::move(callback).Run(type::Result::LEDGER_OK,

@@ -3576,7 +3576,7 @@ void RewardsServiceImpl::BackUpVGSpendStatuses() {
 
 void RewardsServiceImpl::OnBackUpVGSpendStatuses(
     ledger::type::Result result,
-    std::vector<ledger::type::VirtualGrantSpendStatusPtr> vg_spend_statuses) {
+    const std::vector<sync_pb::VgSpendStatusSpecifics>& vg_spend_statuses) {
   VLOG(0) << "OnBackUpVGSpendStatuses";
   vg_sync_service_->UpdateVgSpendStatuses(std::move(vg_spend_statuses));
 }

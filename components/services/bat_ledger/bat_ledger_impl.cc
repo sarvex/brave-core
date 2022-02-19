@@ -1150,7 +1150,7 @@ void BatLedgerImpl::RestoreVGs(RestoreVGsCallback callback) {
 void BatLedgerImpl::OnBackUpVGSpendStatuses(
     CallbackHolder<BackUpVGSpendStatusesCallback>* holder,
     ledger::type::Result result,
-    std::vector<ledger::type::VirtualGrantSpendStatusPtr> vg_spend_statuses) {
+    const std::vector<sync_pb::VgSpendStatusSpecifics>& vg_spend_statuses) {
   DCHECK(holder);
   if (holder->is_valid()) {
     std::move(holder->get()).Run(result, std::move(vg_spend_statuses));
