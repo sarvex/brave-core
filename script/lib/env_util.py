@@ -8,11 +8,10 @@ import sys
 
 
 def validate_pair(ob):
-    if not (len(ob) == 2):
-        print("Unexpected result:", ob, file=sys.stderr)
-        return False
-    else:
+    if len(ob) == 2:
         return True
+    print("Unexpected result:", ob, file=sys.stderr)
+    return False
 
 
 def consume(iter):

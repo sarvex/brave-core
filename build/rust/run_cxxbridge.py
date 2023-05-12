@@ -25,7 +25,7 @@ def run(cargo_path, args, output, is_header):
   exe = os.path.abspath(os.path.join(cargo_home, 'bin', 'cxxbridge'))
 
   if sys.platform == "win32":
-    exe = exe + '.exe'
+    exe = f'{exe}.exe'
 
   cmdargs = [exe]
   cmdargs.extend(args)

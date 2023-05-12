@@ -29,27 +29,24 @@ RUSTUP_HOME = os.path.join(RUSTUP_PATH, RUST_DEPS_PACKAGE_VERSION)
 
 
 def get_url(platform):
-    if platform == "win32" or platform == "cygwin":
-        filename = "rust_deps_win_" + RUST_DEPS_PACKAGE_VERSION + ".zip"
+    if platform in ["win32", "cygwin"]:
+        filename = f"rust_deps_win_{RUST_DEPS_PACKAGE_VERSION}.zip"
     elif platform == 'darwin':
-        filename = "rust_deps_mac_" + RUST_DEPS_PACKAGE_VERSION + ".gz"
+        filename = f"rust_deps_mac_{RUST_DEPS_PACKAGE_VERSION}.gz"
     elif platform == 'ios':
-        filename = "rust_deps_ios_" + RUST_DEPS_PACKAGE_VERSION + ".gz"
+        filename = f"rust_deps_ios_{RUST_DEPS_PACKAGE_VERSION}.gz"
     elif platform.startswith('linux'):
-        filename = "rust_deps_linux_" + RUST_DEPS_PACKAGE_VERSION + ".gz"
+        filename = f"rust_deps_linux_{RUST_DEPS_PACKAGE_VERSION}.gz"
     else:
-        print('Invalid platform for Rust deps: %s' % platform)
+        print(f'Invalid platform for Rust deps: {platform}')
         print('Exiting.')
         sys.exit(1)
 
-    return RUST_DEPS_PACKAGES_URL + "/" + filename
+    return f"{RUST_DEPS_PACKAGES_URL}/{filename}"
 
 
 def should_download():
-    if os.path.exists(RUSTUP_HOME):
-        return False
-
-    return True
+    return not os.path.exists(RUSTUP_HOME)
 
 
 def download_and_unpack_rust_deps(platform):
@@ -61,7 +58,7 @@ def download_and_unpack_rust_deps(platform):
     try:
         deps.DownloadAndUnpack(url, RUSTUP_PATH)
     except URLError:
-        print('Failed to download Rust deps: %s' % url)
+        print(f'Failed to download Rust deps: {url}')
         print('Exiting.')
         sys.exit(1)
 
@@ -85,7 +82,7 @@ def get_android_target(target_arch):
 
 
 def get_android_linker(target_arch):
-    return get_android_target(target_arch) + "-clang"
+    return f"{get_android_target(target_arch)}-clang"
 
 
 def make_standalone_toolchain_for_android():
@@ -96,32 +93,29 @@ def make_standalone_toolchain_for_android():
         ANDROID_NDK_PATH, 'build', 'tools', 'make_standalone_toolchain.py')
 
     config_path = os.path.join(RUSTUP_HOME, 'config')
-    fp = open(config_path, "w+")
+    with open(config_path, "w+") as fp:
+        for target_arch in ['arm', 'arm64', 'x86', 'x86_64']:
+            toolchain_path = os.path.join(RUSTUP_PATH, 'toolchains', target_arch)
 
-    for target_arch in ['arm', 'arm64', 'x86', 'x86_64']:
-        toolchain_path = os.path.join(RUSTUP_PATH, 'toolchains', target_arch)
+            api_level = get_android_api_level(target_arch)
 
-        api_level = get_android_api_level(target_arch)
+                    # Make standalone Android toolchain for target_arch
+            toolchain_args = [
+                make_standalone_toolchain,
+                "--force",
+                f"--install-dir={toolchain_path}",
+                f"--api={api_level}",
+                f"--arch={target_arch}",
+            ]
+            try:
+                subprocess.check_call(toolchain_args, env=None)
+            except subprocess.CalledProcessError as e:
+                print(e.output)
+                raise e
 
-        # Make standalone Android toolchain for target_arch
-        toolchain_args = []
-        toolchain_args.append(make_standalone_toolchain)
-        toolchain_args.append("--force")
-        toolchain_args.append("--install-dir=" + toolchain_path)
-        toolchain_args.append("--api=" + api_level)
-        toolchain_args.append("--arch=" + target_arch)
-
-        try:
-            subprocess.check_call(toolchain_args, env=None)
-        except subprocess.CalledProcessError as e:
-            print(e.output)
-            raise e
-
-        # Add target to rustup config
-        fp.write("[target." + get_android_target(target_arch) + "]\r\n")
-        fp.write("linker = \"" + get_android_linker(target_arch) + "\"\r\n")
-
-    fp.close()
+                    # Add target to rustup config
+            fp.write(f"[target.{get_android_target(target_arch)}" + "]\r\n")
+            fp.write("linker = \"" + get_android_linker(target_arch) + "\"\r\n")
 
 
 def parse_args():
@@ -129,8 +123,7 @@ def parse_args():
 
     parser.add_argument('--platform')
 
-    args = parser.parse_args()
-    return args
+    return parser.parse_args()
 
 
 def cargo_install(tool):
@@ -144,14 +137,10 @@ def cargo_install(tool):
         rustup_bin, "cargo" if sys.platform != "win32" else "cargo.exe")
 
     # Install the tool
-    cargo_args = []
-    cargo_args.append(cargo_bin)
-    cargo_args.append("install")
-    cargo_args.append(tool["name"])
+    cargo_args = [cargo_bin, "install", tool["name"]]
     if "path" in tool:
         cargo_args.append("--path")
-        cargo_args.append(tool["path"])
-        cargo_args.append("--target-dir")
+        cargo_args.extend((tool["path"], "--target-dir"))
         cargo_args.append(os.path.join(RUSTUP_HOME, ".build"))
     if "version" in tool:
         cargo_args.append("--version")

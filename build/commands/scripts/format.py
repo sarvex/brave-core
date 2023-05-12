@@ -33,7 +33,7 @@ def main(args):
         git_cl.RunGit(cmd)
     except:
         e = sys.exc_info()[1]
-        print('Could not run format: %s' % e.message)
+        print(f'Could not run format: {e.message}')
         return 1
     finally:
         os.chdir(previous_cwd)

@@ -22,19 +22,18 @@ from util import build_utils
 from util import resource_utils
 
 
-def  _UnderJavaRes(source):
+def _UnderJavaRes(source):
   """
   Check from left whether java/res is part of input path, returns relative path to java/res.
   Input path shall be absolute.
   """
   source_path = Path(source)
   source_path_parts = source_path.parts
-  for  i in range(1, len(source_path_parts)):
+  for i in range(1, len(source_path_parts)):
     if source_path_parts[i - 1] == 'java' and source_path_parts[i] == 'res':
       parent_path = source_path.parents[len(source_path_parts) - i - 2]
       try:
-        rel_path = str(source_path.relative_to(parent_path))
-        return rel_path
+        return str(source_path.relative_to(parent_path))
       except ValueError as e:
         print(e)
         return None
@@ -42,7 +41,7 @@ def  _UnderJavaRes(source):
 
 def _AddBravePrefix(relpath):
   dirname, filename = os.path.split(relpath)
-  return os.path.join(dirname, 'brave_' + filename)
+  return os.path.join(dirname, f'brave_{filename}')
 
 
 def _ImportModuleByPath(module_path):
@@ -89,7 +88,7 @@ def _XMLTransform(source_pairs, outputs_zip):
       # Parse output path
       # For simplicity, we assume input path will always has java/res in it
       if not (relpath := _UnderJavaRes(os.path.abspath(source))):
-        raise Exception('input file %s is not under java/res' % source)
+        raise Exception(f'input file {source} is not under java/res')
 
       # resource_overlay doesn't seem to work from android_generated_resources
       relpath = _AddBravePrefix(relpath)
@@ -99,7 +98,7 @@ def _XMLTransform(source_pairs, outputs_zip):
       _ProcessFile(output_filename, output)
       path_info.AddMapping(relpath, source)
 
-    path_info.Write(outputs_zip + '.info')
+    path_info.Write(f'{outputs_zip}.info')
     build_utils.ZipDir(outputs_zip, temp_dir)
 
 

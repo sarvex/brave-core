@@ -47,14 +47,15 @@ def _GetBraveDefinitionAction(brave_definition):
         return _DEFINITION_ADD
       elif attribute.key == 'BraveExtend':
         return _DEFINITION_EXTEND
-  raise ValueError("Definition should have [BraveAdd] or [BraveExtend] attribute: %s" %
-                   brave_definition.mojom_name)
+  raise ValueError(
+      f"Definition should have [BraveAdd] or [BraveExtend] attribute: {brave_definition.mojom_name}"
+  )
 
 
 # Validates that a definition with same name doesn't exist in the list.
 def _CheckDefinitionDoesntExist(brave_definition, ast_items):
   if any(_AstDefinitionNamePred(brave_definition, item) for item in ast_items):
-    raise ValueError("Definition already exists: %s" % brave_definition.mojom_name)
+    raise ValueError(f"Definition already exists: {brave_definition.mojom_name}")
 
 
 # Finds a definition by name and type.
@@ -70,13 +71,10 @@ def _ExtendAstDefinition(brave_definition, ast_definition):
     for item in brave_definition.enum_value_list:
       _CheckDefinitionDoesntExist(item, ast_definition.enum_value_list)
       ast_definition.enum_value_list.Append(item)
-  elif isinstance(brave_definition, ast.Interface) or \
-       isinstance(brave_definition, ast.Struct) or \
-       isinstance(brave_definition, ast.Union):
+  elif isinstance(brave_definition, (ast.Interface, ast.Struct, ast.Union)):
     items_to_append = []
     for item in reversed(brave_definition.body.items):
-      if isinstance(item, ast.Const) or \
-         isinstance(item, ast.Enum):
+      if isinstance(item, (ast.Const, ast.Enum)):
          # Handle nested types.
         _ApplyBraveDefinition(item, ast_definition.body)
       else:
@@ -86,7 +84,7 @@ def _ExtendAstDefinition(brave_definition, ast_definition):
     for item in reversed(items_to_append):
       ast_definition.body.Append(item)
   else:
-    raise ValueError("Unhandled definition: %s" % brave_definition.mojom_name)
+    raise ValueError(f"Unhandled definition: {brave_definition.mojom_name}")
 
 
 # Adds or extends mojom ast definition.
@@ -99,20 +97,25 @@ def _ApplyBraveDefinition(brave_definition, ast_definitions):
     else:
       ast_definitions.insert(0, brave_definition)
   elif definition_action == _DEFINITION_EXTEND:
-    ast_definition_to_extend = _FindMatchingDefinition(brave_definition, ast_definitions)
-    if not ast_definition_to_extend:
-      raise ValueError("Trying to extend non-existent definition: %s" % brave_definition.mojom_name)
-    _ExtendAstDefinition(brave_definition, ast_definition_to_extend)
+    if ast_definition_to_extend := _FindMatchingDefinition(
+        brave_definition, ast_definitions):
+      _ExtendAstDefinition(brave_definition, ast_definition_to_extend)
+    else:
+      raise ValueError(
+          f"Trying to extend non-existent definition: {brave_definition.mojom_name}"
+      )
   else:
-    raise ValueError("Unknown definition action requested: %s" % brave_definition.mojom_name)
+    raise ValueError(
+        f"Unknown definition action requested: {brave_definition.mojom_name}")
 
 
 # Applies changes to original mojom ast using brave ast.
 def _ApplyBraveAstChanges(brave_ast, ast):
   # Make sure the module name is correct.
   if brave_ast.module != ast.module:
-    raise ValueError("Mojo module ids are not equal while trying to patch: %s vs %s" % \
-          (brave_ast.module.mojom_namespace, ast.module.mojom_namespace))
+    raise ValueError(
+        f"Mojo module ids are not equal while trying to patch: {brave_ast.module.mojom_namespace} vs {ast.module.mojom_namespace}"
+    )
 
   # Add new imports.
   for brave_import in brave_ast.import_list:
@@ -154,7 +157,9 @@ def PatchMojomAst(mojom_abspath, ast, enabled_features):
   # Build brave/chromium_src path.
   chromium_src_abspath = os.path.join(chromium_original_dir, 'brave', 'chromium_src')
   if not os.path.isdir(chromium_src_abspath):
-    raise RuntimeError("Could not find brave/chromium_src. %s is not a dir" % chromium_src_abspath)
+    raise RuntimeError(
+        f"Could not find brave/chromium_src. {chromium_src_abspath} is not a dir"
+    )
 
   # Relative path.
   mojom_relpath = mojom_abspath[len(chromium_original_dir) + 1:]

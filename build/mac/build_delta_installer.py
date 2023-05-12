@@ -12,7 +12,7 @@ import sys
 
 
 def unmount(volume_path):
-    print('-> unmount ' + volume_path)
+    print(f'-> unmount {volume_path}')
     command = ['hdiutil', 'detach', volume_path]
     try:
         subprocess.check_call(command)
@@ -22,7 +22,7 @@ def unmount(volume_path):
 
 
 def mount_dmg(dmg_path, mount_point):
-    print('-> mounting ' + dmg_path + ' to ' + mount_point)
+    print(f'-> mounting {dmg_path} to {mount_point}')
 
     command = ['hdiutil', 'attach', dmg_path, '-mountpoint', mount_point]
     try:

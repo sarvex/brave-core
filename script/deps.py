@@ -28,7 +28,7 @@ def DownloadUrl(url, output_file):
 
     while True:
         try:
-            sys.stdout.write('Downloading %s ' % url)
+            sys.stdout.write(f'Downloading {url} ')
             sys.stdout.flush()
             response = urlopen(url)
             total_size = int(response.info().get('Content-Length').strip())

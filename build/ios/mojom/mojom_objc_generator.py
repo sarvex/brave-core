@@ -34,11 +34,11 @@ class StringMojoTypemap(MojoTypemap):
     def ExpectedCppType(self):
         return "std::string"
     def DefaultObjCValue(self, default):
-        return "@%s" % default if default is not None else '@""'
+        return f"@{default}" if default is not None else '@""'
     def ObjCToCpp(self, accessor):
-        return "base::SysNSStringToUTF8(%s)" % accessor
+        return f"base::SysNSStringToUTF8({accessor})"
     def CppToObjC(self, accessor):
-        return "base::SysUTF8ToNSString(%s)" % accessor
+        return f"base::SysUTF8ToNSString({accessor})"
 
 class TimeMojoTypemap(MojoTypemap):
     @staticmethod
@@ -52,9 +52,9 @@ class TimeMojoTypemap(MojoTypemap):
     def DefaultObjCValue(self, default):
         return "[[NSDate alloc] init]"
     def ObjCToCpp(self, accessor):
-        return "base::Time::FromNSDate(%s)" % accessor
+        return f"base::Time::FromNSDate({accessor})"
     def CppToObjC(self, accessor):
-        return "%s.ToNSDate()" % accessor
+        return f"{accessor}.ToNSDate()"
 
 class TimeDeltaMojoTypemap(MojoTypemap):
     @staticmethod
@@ -68,10 +68,9 @@ class TimeDeltaMojoTypemap(MojoTypemap):
     def DefaultObjCValue(self, default):
         return "[[NSDate alloc] init]"
     def ObjCToCpp(self, accessor):
-        return "base::Seconds(%s.timeIntervalSince1970)" % accessor
+        return f"base::Seconds({accessor}.timeIntervalSince1970)"
     def CppToObjC(self, accessor):
-        return ("[NSDate dateWithTimeIntervalSince1970:%s.InSecondsF()]"
-                % accessor)
+        return f"[NSDate dateWithTimeIntervalSince1970:{accessor}.InSecondsF()]"
 
 class URLMojoTypemap(MojoTypemap):
     @staticmethod
@@ -85,9 +84,9 @@ class URLMojoTypemap(MojoTypemap):
     def DefaultObjCValue(self, default):
         return "[[NSURL alloc] init]"
     def ObjCToCpp(self, accessor):
-        return "net::GURLWithNSURL(%s)" % accessor
+        return f"net::GURLWithNSURL({accessor})"
     def CppToObjC(self, accessor):
-        return "net::NSURLWithGURL(%s)" % accessor
+        return f"net::NSURLWithGURL({accessor})"
 
 _kind_to_c_type = {
     mojom.BOOL: "bool",
@@ -122,22 +121,18 @@ class NumberMojoTypemap(MojoTypemap):
     def IsMojoType(kind):
         return kind in _kind_to_nsnumber_getter
     def ObjCWrappedType(self):
-        if self.is_inside_container:
-            return "NSNumber*"
-        return _kind_to_c_type[self.kind]
+        return "NSNumber*" if self.is_inside_container else _kind_to_c_type[self.kind]
     def ExpectedCppType(self):
         return _kind_to_c_type[self.kind]
     def ObjCToCpp(self, accessor):
         if self.is_inside_container:
-            return "%s.%s" % (accessor, _kind_to_nsnumber_getter[self.kind])
+            return f"{accessor}.{_kind_to_nsnumber_getter[self.kind]}"
         return accessor
     def DefaultObjCValue(self, default):
         # Default for primitives not needed, array/map default is empty
         return default
     def CppToObjC(self, accessor):
-        if self.is_inside_container:
-            return "@(%s)" % accessor
-        return accessor
+        return f"@({accessor})" if self.is_inside_container else accessor
 
 class ArrayMojoTypemap(MojoTypemap):
     def __init__(self, kind, is_inside_container):
@@ -148,9 +143,9 @@ class ArrayMojoTypemap(MojoTypemap):
     def IsMojoType(kind):
         return mojom.IsArrayKind(kind)
     def ObjCWrappedType(self):
-        return "NSArray<%s>*" % self.wrappedTypemap.ObjCWrappedType()
+        return f"NSArray<{self.wrappedTypemap.ObjCWrappedType()}>*"
     def ExpectedCppType(self):
-        return "std::vector<%s>" % self.wrappedTypemap.ExpectedCppType()
+        return f"std::vector<{self.wrappedTypemap.ExpectedCppType()}>"
     def DefaultObjCValue(self, default):
         return "@[]"
     def ObjCToCpp(self, accessor):
@@ -179,14 +174,14 @@ class StructMojoTypemap(MojoTypemap):
     def IsMojoType(kind):
         return mojom.IsStructKind(kind)
     def ObjCWrappedType(self):
-        return "%s%s*" % (ObjCPrefixFromKind(self.kind), self.kind.name)
+        return f"{ObjCPrefixFromKind(self.kind)}{self.kind.name}*"
     def ExpectedCppType(self):
-        return "%s::%sPtr" % (CppNamespaceFromKind(self.kind), self.kind.name)
+        return f"{CppNamespaceFromKind(self.kind)}::{self.kind.name}Ptr"
     def DefaultObjCValue(self, default):
         args = (ObjCPrefixFromKind(self.kind), self.kind.name)
         return "[[%s%s alloc] init]" % args
     def ObjCToCpp(self, accessor):
-        return "%s.cppObjPtr" % accessor
+        return f"{accessor}.cppObjPtr"
     def CppToObjC(self, accessor):
         args = (ObjCPrefixFromKind(self.kind), self.kind.name, self.kind.name,
                 accessor)
@@ -197,17 +192,17 @@ class EnumMojoTypemap(MojoTypemap):
     def IsMojoType(kind):
         return mojom.IsEnumKind(kind)
     def ObjCWrappedType(self):
-        return "%s%s" % (ObjCPrefixFromKind(self.kind), self.kind.name)
+        return f"{ObjCPrefixFromKind(self.kind)}{self.kind.name}"
     def ExpectedCppType(self):
-        return "%s::%s" % (CppNamespaceFromKind(self.kind), self.kind.name)
+        return f"{CppNamespaceFromKind(self.kind)}::{self.kind.name}"
     def DefaultObjCValue(self, default):
         if default is None:
             return None
-        return self.CppToObjC("%s::%s" % (self.ExpectedCppType(), default.name))
+        return self.CppToObjC(f"{self.ExpectedCppType()}::{default.name}")
     def ObjCToCpp(self, accessor):
-        return "static_cast<%s>(%s)" % (self.ExpectedCppType(), accessor)
+        return f"static_cast<{self.ExpectedCppType()}>({accessor})"
     def CppToObjC(self, accessor):
-        return "static_cast<%s>(%s)" % (self.ObjCWrappedType(), accessor)
+        return f"static_cast<{self.ObjCWrappedType()}>({accessor})"
 
 class DictionaryMojoTypemap(MojoTypemap):
     def __init__(self, kind, is_inside_container):
@@ -219,19 +214,20 @@ class DictionaryMojoTypemap(MojoTypemap):
     def IsMojoType(kind):
         return mojom.IsMapKind(kind)
     def ObjCWrappedType(self):
-        return "NSDictionary<%s, %s>*" % (self.keyTypemap.ObjCWrappedType(),
-                                          self.valueTypemap.ObjCWrappedType())
+        return f"NSDictionary<{self.keyTypemap.ObjCWrappedType()}, {self.valueTypemap.ObjCWrappedType()}>*"
     def ExpectedCppType(self):
-        return "base::flat_map<%s, %s>" % (self.keyTypemap.ExpectedCppType(),
-                                           self.valueTypemap.ExpectedCppType())
+        return f"base::flat_map<{self.keyTypemap.ExpectedCppType()}, {self.valueTypemap.ExpectedCppType()}>"
     def DefaultObjCValue(self, default):
         return "@{}"
     def ObjCToCpp(self, accessor):
-        args = (self.keyTypemap.ExpectedCppType(),
-                self.valueTypemap.ExpectedCppType(),
-                self.keyTypemap.ObjCWrappedType(), accessor,
-                self.keyTypemap.ObjCToCpp("key"),
-                self.valueTypemap.ObjCToCpp("%s[key]" % accessor))
+        args = (
+            self.keyTypemap.ExpectedCppType(),
+            self.valueTypemap.ExpectedCppType(),
+            self.keyTypemap.ObjCWrappedType(),
+            accessor,
+            self.keyTypemap.ObjCToCpp("key"),
+            self.valueTypemap.ObjCToCpp(f"{accessor}[key]"),
+        )
         return """^{
             base::flat_map<%s, %s> map;
             for (%s key in %s) {
@@ -262,9 +258,9 @@ class BaseDictionaryValueMojoTypemap(MojoTypemap):
     def DefaultObjCValue(self, default):
         return "@{}"
     def ObjCToCpp(self, accessor):
-        return "brave::BaseValueFromNSDictionary(%s)" % accessor
+        return f"brave::BaseValueFromNSDictionary({accessor})"
     def CppToObjC(self, accessor):
-        return "brave::NSDictionaryFromBaseValue(%s)" % accessor
+        return f"brave::NSDictionaryFromBaseValue({accessor})"
 
 class BaseListValueMojoTypemap(MojoTypemap):
     @staticmethod
@@ -278,20 +274,18 @@ class BaseListValueMojoTypemap(MojoTypemap):
     def DefaultObjCValue(self, default):
         return "@[]"
     def ObjCToCpp(self, accessor):
-        return "brave::BaseValueFromNSArray(%s)" % accessor
+        return f"brave::BaseValueFromNSArray({accessor})"
     def CppToObjC(self, accessor):
-        return "brave::NSArrayFromBaseValue(%s)" % accessor
+        return f"brave::NSArrayFromBaseValue({accessor})"
 
 class PendingRemoteMojoTypemap(MojoTypemap):
     @staticmethod
     def IsMojoType(kind):
         return mojom.IsPendingRemoteKind(kind)
     def ObjCWrappedType(self):
-        return "id<%s%s>" % (ObjCPrefixFromKind(self.kind.kind),
-                             self.kind.kind.name)
+        return f"id<{ObjCPrefixFromKind(self.kind.kind)}{self.kind.kind.name}>"
     def ExpectedCppType(self):
-        return "%s::%s" % (CppNamespaceFromKind(self.kind.kind),
-                           self.kind.kind.name)
+        return f"{CppNamespaceFromKind(self.kind.kind)}::{self.kind.kind.name}"
     def DefaultObjCValue(self, default):
         return None
     def ObjCToCpp(self, accessor):
@@ -312,14 +306,14 @@ class UnionMojoTypemap(MojoTypemap):
     def IsMojoType(kind):
         return mojom.IsUnionKind(kind)
     def ObjCWrappedType(self):
-        return "%s%s*" % (ObjCPrefixFromKind(self.kind), self.kind.name)
+        return f"{ObjCPrefixFromKind(self.kind)}{self.kind.name}*"
     def ExpectedCppType(self):
-        return "%s::%sPtr" % (CppNamespaceFromKind(self.kind), self.kind.name)
+        return f"{CppNamespaceFromKind(self.kind)}::{self.kind.name}Ptr"
     def DefaultObjCValue(self, default):
         args = (ObjCPrefixFromKind(self.kind), self.kind.name)
         return "[[%s%s alloc] init]" % args
     def ObjCToCpp(self, accessor):
-        return "%s.cppObjPtr" % accessor
+        return f"{accessor}.cppObjPtr"
     def CppToObjC(self, accessor):
         args = (ObjCPrefixFromKind(self.kind), self.kind.name, self.kind.name,
                 accessor)
@@ -344,7 +338,7 @@ _mojo_typemaps = [
 def MojoTypemapForKind(kind, is_inside_container=False):
     typemap = next((x for x in _mojo_typemaps if x.IsMojoType(kind)), None)
     if typemap is None:
-        raise Exception("No typemap available for the given kind: %s" % kind)
+        raise Exception(f"No typemap available for the given kind: {kind}")
     return typemap(kind, is_inside_container)
 
 def CppNamespaceFromKind(kind):
@@ -375,11 +369,10 @@ class Generator(generator.Generator):
         return "objc_templates"
 
     def GetFilters(self):
-        objc_filters = {
+        return {
             "objc_property_modifiers": self._GetObjCPropertyModifiers,
             "objc_property_default": self._GetObjCPropertyDefaultValue,
-            "objc_property_needs_default_assignment": \
-                self._ObjcPropertyNeedsDefaultValueAssignment,
+            "objc_property_needs_default_assignment": self._ObjcPropertyNeedsDefaultValueAssignment,
             "objc_wrapper_type": self._GetObjCWrapperType,
             "objc_property_formatter": self._ObjCPropertyFormatter,
             "objc_method_name_formatter": self._ObjCMethodNameFormatter,
@@ -394,15 +387,13 @@ class Generator(generator.Generator):
             "under_to_lower_camel": UnderToLowerCamel,
             "interface_remote_sets": self._GetInterfaceRemoteSets,
         }
-        return objc_filters
 
     def _GetInterfaceRemoteSets(self, interface):
         remotes = []
         for method in interface.methods:
             for param in method.parameters:
                 if mojom.IsPendingRemoteKind(param.kind):
-                    name = "%s%sBridge" % (ObjCPrefixFromKind(param.kind.kind),
-                                           param.kind.kind.name)
+                    name = f"{ObjCPrefixFromKind(param.kind.kind)}{param.kind.kind.name}Bridge"
                     remotes.append(name)
         return set(remotes)
 
@@ -415,18 +406,15 @@ class Generator(generator.Generator):
             if mojom.IsMapKind(kind):
                 return (is_move_only_kind(kind.value_kind) or
                         is_move_only_kind(kind.key_kind))
-            if mojom.IsAnyHandleOrInterfaceKind(kind):
-                return True
-            return False
+            return bool(mojom.IsAnyHandleOrInterfaceKind(kind))
+
         should_pass_param_by_value = ((not mojom.IsReferenceKind(kind)) or
                                       is_move_only_kind(kind))
         typemap = MojoTypemapForKind(kind, False)
         typestring = typemap.ExpectedCppType()
         if mojom.IsNullableKind(kind) and not mojom.IsStructKind(kind):
-            typestring = "absl::optional<%s>" % typestring
-        if should_pass_param_by_value:
-            return typestring
-        return "const %s&" % typestring
+            typestring = f"absl::optional<{typestring}>"
+        return typestring if should_pass_param_by_value else f"const {typestring}&"
 
     def _GetObjCPropertyModifiers(self, kind, inside_union=False):
         modifiers = ['nonatomic']
@@ -445,10 +433,7 @@ class Generator(generator.Generator):
             return False
         if typemap.DefaultObjCValue(field.default) is None:
             return False
-        if typemap is NumberMojoTypemap and field.default == 0:
-            # 0 by default anyways
-            return False
-        return True
+        return typemap is not NumberMojoTypemap or field.default != 0
 
     def _GetObjCPropertyDefaultValue(self, field):
         kind = field.kind
@@ -482,9 +467,7 @@ class Generator(generator.Generator):
             'finalize': 'finalize_',
             'copy': 'copy_'
         }
-        if name in reserved:
-            return reserved[name]
-        return name
+        return reserved.get(name, name)
 
     def _ObjCMethodNameFormatter(self, method):
         name = method.name
@@ -503,32 +486,30 @@ class Generator(generator.Generator):
 
     def _ObjCToCppAssign(self, field, obj=None):
         kind = field.kind
-        accessor = "%s%s" % (obj + "." if obj else "",
-                             self._ObjCPropertyFormatter(field.name))
+        accessor = (
+            f'{f"{obj}." if obj else ""}{self._ObjCPropertyFormatter(field.name)}'
+        )
         typemap = MojoTypemapForKind(kind)
         if typemap is None:
-            raise Exception("No typemap found for the given kind: %s" % kind)
+            raise Exception(f"No typemap found for the given kind: {kind}")
         cpp_assign = typemap.ObjCToCpp(accessor)
         if mojom.IsNullableKind(kind):
             if mojom.IsStructKind(kind):
-                cpp_assign = "%s ? %s : nullptr" % (accessor, cpp_assign)
+                cpp_assign = f"{accessor} ? {cpp_assign} : nullptr"
             else:
-                cpp_assign = "%s ? absl::make_optional(%s) : absl::nullopt" % (
-                    accessor, cpp_assign)
+                cpp_assign = f"{accessor} ? absl::make_optional({cpp_assign}) : absl::nullopt"
         return cpp_assign
 
     def _CppToObjCAssign(self, field, prefix=None, suffix=None):
         kind = field.kind
-        accessor = "%s%s%s" % (prefix if prefix else "",
-                               field.name, (suffix if suffix else ""))
+        accessor = f'{prefix if prefix else ""}{field.name}{suffix if suffix else ""}'
         typemap = MojoTypemapForKind(kind)
         if mojom.IsNullableKind(kind):
             if mojom.IsStructKind(kind):
                 value_accessor = accessor
             else:
-                value_accessor = "%s.value()" % accessor
-            return "%s ? %s : nil" % (
-                accessor, typemap.CppToObjC(value_accessor))
+                value_accessor = f"{accessor}.value()"
+            return f"{accessor} ? {typemap.CppToObjC(value_accessor)} : nil"
         return typemap.CppToObjC(accessor)
 
     def _ConstObjCAssign(self, constant):
@@ -536,11 +517,12 @@ class Generator(generator.Generator):
         # Obj-C only supports a handful of constant types
         if mojom.IsStringKind(kind):
             # string constant value come with quotes already
-            return '@%s' % constant.value
+            return f'@{constant.value}'
         if kind in _kind_to_nsnumber_getter:
             return constant.value
         raise Exception(
-            "Obj-C constant cannot be generated for the given kind: %s" % kind)
+            f"Obj-C constant cannot be generated for the given kind: {kind}"
+        )
 
     def _GetJinjaExports(self):
         all_structs = [item for item in
@@ -614,8 +596,10 @@ class Generator(generator.Generator):
         self.module.Stylize(generator.Stylizer())
         name = os.path.basename(self.module.path)
 
-        self.Write(self._GenerateModuleHeader(), output_dir, "%s.objc.h" % name)
-        self.Write(self._GeneratePrivateModuleHeader(), output_dir,
-                   "%s.objc+private.h" % name)
-        self.Write(self._GenerateModuleSource(), output_dir,
-                   "%s.objc.mm" % name)
+        self.Write(self._GenerateModuleHeader(), output_dir, f"{name}.objc.h")
+        self.Write(
+            self._GeneratePrivateModuleHeader(),
+            output_dir,
+            f"{name}.objc+private.h",
+        )
+        self.Write(self._GenerateModuleSource(), output_dir, f"{name}.objc.mm")

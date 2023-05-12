@@ -83,7 +83,7 @@ def do_check_includes(override_filepath):
             regexp = r'^#include "src/(.*)"'
             line_match = re.search(regexp, line)
             if line_match:
-                if line_match.group(1) != normalized_override_filepath:
+                if line_match[1] != normalized_override_filepath:
                     print(f"WARNING: {override_filepath} uses a src/-prefixed" +
                           " include that doesn't point to the expected file:")
                     print(f"         Include: {line}" +
@@ -106,7 +106,7 @@ def do_check_includes(override_filepath):
 
             # Count the number of '../' elements, but don't use the OS's path
             # separator here, since we're counting paths from a C++ include.
-            include_path = line_match.group(1)
+            include_path = line_match[1]
             actual_count = include_path.split('/').count('..')
 
             # Check actual vs expected.
@@ -160,7 +160,7 @@ def do_check_defines(override_filepath, original_filepath):
             if match['is_func'] and target.startswith('BUILDFLAG_INTERNAL_'):
                 buildflag_match = re.search(
                     r'BUILDFLAG_INTERNAL_(\S*)', target)
-                target = buildflag_match.group(1)
+                target = buildflag_match[1]
 
             # Report ERROR if target can't be found in the original file.
             with open(original_filepath, mode='r', encoding='utf-8') as \

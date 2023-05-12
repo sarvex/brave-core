@@ -26,8 +26,7 @@ class ColumnExtractor(BaseEstimator, TransformerMixin):
     def fit(self, X, y=None):
         return self
     def transform(self, X):
-        X_cols = X[self.columns]
-        return X_cols
+        return X[self.columns]
 
 def _load_dataset(path):
     """
@@ -45,7 +44,10 @@ def _load_dataset(path):
     # Define columns
     top_level_cols = ['adblockRequests']
     third_party_cols = [c for c in df.columns if 'thirdParties.' in c]
-    metrics_cols = list(set([c for c in df.columns if 'metrics.' in c]) - set(['metrics.firstCPUIdle', 'metrics.observedLastVisualChange']))
+    metrics_cols = list(
+        {c for c in df.columns if 'metrics.' in c}
+        - {'metrics.firstCPUIdle', 'metrics.observedLastVisualChange'}
+    )
     resources_cols = [c for c in df.columns if 'resources.' in c]
     diagnostics_cols = [c for c in df.columns if 'diagnostics.' in c]
     dom_cols = [c for c in df.columns if 'dom.' in c]
@@ -94,15 +96,13 @@ def _build_model(num_cols, cat_cols, reg):
     ])
 
     feature_selector = SelectKBest(mutual_info_regression)
-    # feature_selector = SelectFromModel(LassoCV(cv=N_FOLDS), threshold=0.0001)
-
-    model = Pipeline([
-        ("pre_processor", pre_processor),
-        ("feature_selector", feature_selector),
-        ("model", reg)
-    ])
-
-    return model
+    return Pipeline(
+        [
+            ("pre_processor", pre_processor),
+            ("feature_selector", feature_selector),
+            ("model", reg),
+        ]
+    )
 
 
 def tune_model(print_params=False, reg=REGRESSOR):
@@ -121,7 +121,7 @@ def tune_model(print_params=False, reg=REGRESSOR):
     print("Best score: ", gs.best_score_)
 
     if print_params:
-        print("Best Hyperparameters: {}".format(gs.best_params_))
+        print(f"Best Hyperparameters: {gs.best_params_}")
 
     return gs.best_params_
 
@@ -164,9 +164,9 @@ def export_model():
         }
     }
     for (name, _, features) in model['pre_processor'].transformers:
-        transformer = model['pre_processor'].named_transformers_[name]
         # print(transformer)
         if name == 'standardise':
+            transformer = model['pre_processor'].named_transformers_[name]
             transformers['standardise']['mean'] = transformer.mean_
             transformers['standardise']['scale'] = transformer.scale_
             transformers['standardise']['features'] = features
@@ -174,7 +174,7 @@ def export_model():
         elif name == 'pass_through':
             transformers['passthrough']['features'] = features
         else:
-            raise Exception('Unexpected pre_processor transformer: {}'.format(name))
+            raise Exception(f'Unexpected pre_processor transformer: {name}')
 
     env = jinja2.Environment(loader=jinja2.FileSystemLoader(EXPORT_TEMPLATE_PATH), trim_blocks=True, lstrip_blocks=True)
     data = {

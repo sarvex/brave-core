@@ -39,17 +39,15 @@ def main():
             "\"refs/tags/\"", "\"v\""))
         exit(1)
 
-    match = re.match(r'^refs/tags/(.*)$', tag)
-    if match:
-        tag = match.group(1)
+    if match := re.match(r'^refs/tags/(.*)$', tag):
+        tag = match[1]
 
-    match = re.match(r'^v(.*)$', tag)
-    if match:
-        version = match.group(1)
+    if match := re.match(r'^v(.*)$', tag):
+        version = match[1]
 
-    logging.debug("CHANGELOG_URL: {}".format(changelog_url))
-    logging.debug("TAG: {}".format(tag))
-    logging.debug("VERSION: {}".format(version))
+    logging.debug(f"CHANGELOG_URL: {changelog_url}")
+    logging.debug(f"TAG: {tag}")
+    logging.debug(f"VERSION: {version}")
 
     changelog_txt = download_from_url(args, logging, changelog_url)
 

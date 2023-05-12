@@ -8,14 +8,13 @@ from lib.util import scoped_cwd, make_zip, tempdir
 
 
 def GetLZMAExec():
-    if sys.platform == 'win32':
-        root_src_dir = os.path.abspath(os.path.join(
-            os.path.dirname(__file__), *[os.pardir] * 2))
-        lzma_exec = os.path.join(root_src_dir, "third_party",
-                                 "lzma_sdk", "Executable", "7za.exe")
-    else:
-        lzma_exec = '7zr'  # Use system 7zr.
-    return lzma_exec
+    if sys.platform != 'win32':
+        return '7zr'
+    root_src_dir = os.path.abspath(os.path.join(
+        os.path.dirname(__file__), *[os.pardir] * 2))
+    return os.path.join(
+        root_src_dir, "third_party", "lzma_sdk", "Executable", "7za.exe"
+    )
 
 
 def main():
@@ -29,7 +28,7 @@ def main():
 
     temp_dir = tempdir('brave_archive')
     lzma_exec = GetLZMAExec()
-    cmd = [lzma_exec, 'x', args.input, '-y', '-o' + temp_dir]
+    cmd = [lzma_exec, 'x', args.input, '-y', f'-o{temp_dir}']
     subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=False)
     with scoped_cwd(os.path.join(temp_dir, args.target_dir)):
         make_zip(args.output, [], ['.'])

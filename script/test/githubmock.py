@@ -25,10 +25,7 @@ class Repo():
 
         def __call__(self, id):
             obj = [x for x in self._releases if x.id == id]
-            if len(obj) == 1:
-                # print('Releases.call(' + str(id) + ') returned tag_name: "' + obj[0].tag_name + '"')
-                return obj[0]
-            return None
+            return obj[0] if len(obj) == 1 else None
 
 
 class Asset():
@@ -59,10 +56,7 @@ class Assets():
 
     def __call__(self, id):
         obj = [x for x in self._assets if x.id == id]
-        if len(obj) == 1:
-            # print('Assets.call(' + str(id) + ') returned name: "' + obj[0].name + '"')
-            return obj[0]
-        return None
+        return obj[0] if len(obj) == 1 else None
 
 
 class Release():

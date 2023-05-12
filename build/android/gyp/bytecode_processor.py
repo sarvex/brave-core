@@ -49,11 +49,7 @@ def main(argv):
     args.missing_classes_allowlist = build_utils.ParseGnList(
         args.missing_classes_allowlist)
 
-    if args.verbose:
-        verbose = '--verbose'
-    else:
-        verbose = '--not-verbose'
-
+    verbose = '--verbose' if args.verbose else '--not-verbose'
     cmd = ([
         args.script, args.input_jar, args.output_jar, verbose, args.is_prebuilt,
         args.enable_thread_annotations, args.enable_check_class_path

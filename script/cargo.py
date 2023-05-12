@@ -50,14 +50,16 @@ def run_cargo(command, args):
     env["RUST_BACKTRACE"] = "1"
 
     try:
-        cargo_args = []
-        cargo_args.append(cargo_exe)
-        cargo_args.append(command)
+        cargo_args = [cargo_exe, command]
         if args.profile == "release":
             cargo_args.append("--release")
-        cargo_args.append("--manifest-path=" + args.manifest_path)
-        cargo_args.append("--target-dir=" + args.build_path)
-        cargo_args.append("--target=" + args.target)
+        cargo_args.extend(
+            (
+                f"--manifest-path={args.manifest_path}",
+                f"--target-dir={args.build_path}",
+                f"--target={args.target}",
+            )
+        )
         subprocess.check_call(cargo_args, env=env)
 
     except subprocess.CalledProcessError as e:

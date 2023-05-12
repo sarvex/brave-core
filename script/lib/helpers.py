@@ -47,8 +47,7 @@ def get_releases_by_tag(repo, tag_name, include_drafts=False):
     next_request = ""
     headers = {'Accept': 'application/vnd.github+json',
                'Authorization': 'token ' + get_env_var('GITHUB_TOKEN')}
-    release_url = GITHUB_URL + "/repos/" + \
-        BRAVE_REPO + "/releases?page=1&per_page=100"
+    release_url = f"{GITHUB_URL}/repos/{BRAVE_REPO}/releases?page=1&per_page=100"
     r = call_github_api(release_url, headers=headers)
     next_request = ""
     # The GitHub API returns paginated results of 100 items maximum per
@@ -61,9 +60,8 @@ def get_releases_by_tag(repo, tag_name, include_drafts=False):
             if include_drafts:
                 if item['tag_name'] == tag_name:
                     return [item]
-            else:
-                if item['tag_name'] == tag_name and not item['draft']:
-                    return [item]
+            elif item['tag_name'] == tag_name and not item['draft']:
+                return [item]
         if r.links.get("next"):
             next_request = r.links["next"]["url"]
             r = call_github_api(next_request, headers=headers)
@@ -79,17 +77,17 @@ def get_release(repo, tag, allow_published_release_updates=False):
     we also allow a published release to be updated.
     """
     release = None
-    releases = get_releases_by_tag(repo, tag, include_drafts=True)
-    if releases:
+    if releases := get_releases_by_tag(repo, tag, include_drafts=True):
         print("[INFO] Found existing release draft")
         if len(releases) > 1:
-            raise UserWarning("[INFO] More then one draft with the tag '{}' "
-                              "found, not sure which one to merge with."
-                              .format(tag))
+            raise UserWarning(
+                f"[INFO] More then one draft with the tag '{tag}' found, not sure which one to merge with."
+            )
         release = releases[0]
         if not allow_published_release_updates and not release['draft']:
-            raise UserWarning("[INFO] Release with tag '{}' is already "
-                              "published, aborting.".format(tag))
+            raise UserWarning(
+                f"[INFO] Release with tag '{tag}' is already published, aborting."
+            )
 
     return release
 
@@ -103,7 +101,7 @@ def release_channel():
 
 
 def get_tag():
-    return 'v' + get_raw_version() + release_channel()
+    return f'v{get_raw_version()}{release_channel()}'
 
 
 def release_name():
@@ -116,8 +114,7 @@ def retry_func(try_func, catch, retries, catch_func=None):
             ret = try_func(count)
             break
         except catch as e:
-            print('[ERROR] Caught exception {}, {} retries left. {}'.format(
-                catch, count, e.message))
+            print(f'[ERROR] Caught exception {catch}, {count} retries left. {e.message}')
             if catch_func:
                 catch_func(count)
             if count >= retries:

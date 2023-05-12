@@ -33,10 +33,11 @@ allowed_html_tags = [
 
 
 def transifex_name_from_greaselion_script_name(script_name):
-    match = re.search(
-        'brave-site-specific-scripts/scripts/(.*)/_locales/en_US/messages.json$', script_name)
-    if match:
-        return 'greaselion_' + match.group(1).replace('-', '_').replace('/', '_')
+    if match := re.search(
+        'brave-site-specific-scripts/scripts/(.*)/_locales/en_US/messages.json$',
+        script_name,
+    ):
+        return 'greaselion_' + match[1].replace('-', '_').replace('/', '_')
     return ''
 
 
@@ -107,18 +108,16 @@ def get_auth():
     password = get_env_var('TRANSIFEX_PASSWORD')
     transifex_api_key = get_env_var('TRANSIFEX_API_KEY')
     auth = None
-    if transifex_api_key:
-        api_key_username = "api:" + transifex_api_key
-        auth = requests.auth.HTTPBasicAuth(api_key_username, '')
-    else:
-        auth = requests.auth.HTTPBasicAuth(username, password)
-    return auth
+    if not transifex_api_key:
+        return requests.auth.HTTPBasicAuth(username, password)
+    api_key_username = f"api:{transifex_api_key}"
+    return requests.auth.HTTPBasicAuth(api_key_username, '')
 
 
 def get_transifex_languages(grd_file_path):
     """Extracts the list of locales supported by the passed in GRD file"""
     xtb_files = get_xtb_files(grd_file_path)
-    return set([lang for (lang, _) in xtb_files])
+    return {lang for (lang, _) in xtb_files}
 
 
 def get_transifex_translation_file_content(source_file_path, filename,
@@ -127,9 +126,7 @@ def get_transifex_translation_file_content(source_file_path, filename,
     lang_code = lang_code.replace('-', '_')
     lang_code = lang_code.replace('iw', 'he')
     lang_code = lang_code.replace('sr_Latn', 'sr_BA@latin')
-    url_part = 'project/%s/resource/%s/translation/%s?mode=default' % (
-        transifex_project_name,
-        transifex_name_from_filename(source_file_path, filename), lang_code)
+    url_part = f'project/{transifex_project_name}/resource/{transifex_name_from_filename(source_file_path, filename)}/translation/{lang_code}?mode=default'
     url = base_url + url_part
     r = requests.get(url, auth=get_auth())
     assert r.status_code >= 200 and r.status_code <= 299, (
@@ -295,7 +292,7 @@ def update_source_string_file_to_transifex(source_file_path, filename,
 def upload_source_string_file_to_transifex(source_file_path, filename,
                                            xml_content, i18n_type):
     """Uploads the specified source string file to transifex"""
-    url_part = 'project/%s/resources/' % transifex_project_name
+    url_part = f'project/{transifex_project_name}/resources/'
     url = base_url + url_part
     payload = {
         'name': transifex_name_from_filename(source_file_path, filename),
@@ -361,7 +358,7 @@ def get_grd_message_string_tags(grd_file_path):
         if element.tag == 'message':
             output_elements.append(element)
         else:
-            assert False, ('Unexpected tag name %s' % element.tag)
+            assert False, f'Unexpected tag name {element.tag}'
 
     elements = lxml.etree.parse(grd_file_path).findall('.//part')
     for element in elements:
@@ -443,7 +440,7 @@ def get_grd_strings(grd_file_path, validate_tags=True):
         # When XTB files are later generated, the ID doesn't matter at all.
         # The only thing that matters is the fingerprint string hash.
         if dupe_dict[message_name] > 1:
-            message_name += "_%s" % dupe_dict[message_name]
+            message_name += f"_{dupe_dict[message_name]}"
         if validate_tags:
             message_xml = lxml.etree.tostring(
                 message_tag, method='xml', encoding='utf-8')
@@ -453,9 +450,9 @@ def get_grd_strings(grd_file_path, validate_tags=True):
         message_desc = message_tag.get('desc') or ''
         message_value = textify(message_tag)
         assert message_name, 'Message name is empty'
-        assert (message_name.startswith('IDS_') or
-                message_name.startswith('PRINT_PREVIEW_MEDIA_')), (
-                    'Invalid message ID: %s' % message_name)
+        assert message_name.startswith('IDS_') or message_name.startswith(
+            'PRINT_PREVIEW_MEDIA_'
+        ), f'Invalid message ID: {message_name}'
         string_name = message_name[4:].lower()
         string_fp = get_fingerprint_for_xtb(message_tag)
         string_tuple = (string_name, message_value, string_fp, message_desc)
@@ -468,7 +465,7 @@ def get_json_strings(json_file_path):
         data = json.load(f)
     strings = []
     for key in data:
-        string_name = key + '.message'
+        string_name = f'{key}.message'
         string_value = data[key]["message"]
         string_desc = data[key]["description"] if "description" in data[key] else ""
         string_tuple = (string_name, string_value, string_desc)
@@ -583,15 +580,13 @@ def check_for_chromium_upgrade_extra_langs(src_root, grd_file_path):
     brave_langs = get_transifex_languages(grd_file_path)
     chromium_langs = get_transifex_languages(chromium_grd_file_path)
     x_brave_extra_langs = brave_langs - chromium_langs
-    assert len(x_brave_extra_langs) == 0, (
-        'Brave GRD %s has extra languages %s over Chromium GRD %s' % (
-            grd_file_path, chromium_grd_file_path,
-            list(x_brave_extra_langs)))
+    assert (
+        len(x_brave_extra_langs) == 0
+    ), f'Brave GRD {grd_file_path} has extra languages {chromium_grd_file_path} over Chromium GRD {list(x_brave_extra_langs)}'
     x_chromium_extra_langs = chromium_langs - brave_langs
-    assert len(x_chromium_extra_langs) == 0, (
-        'Chromium GRD %s has extra languages %s over Brave GRD %s' % (
-            chromium_grd_file_path, grd_file_path,
-            list(x_chromium_extra_langs)))
+    assert (
+        len(x_chromium_extra_langs) == 0
+    ), f'Chromium GRD {chromium_grd_file_path} has extra languages {grd_file_path} over Brave GRD {list(x_chromium_extra_langs)}'
 
 
 def get_transifex_string_hash(string_name):
@@ -677,10 +672,7 @@ def check_for_chromium_upgrade(src_root, grd_file_path):
 def get_transifex_source_resource_strings(grd_file_path):
     """Obtains the list of strings from Transifex"""
     filename = os.path.basename(grd_file_path).split('.')[0]
-    url_part = (
-        'project/%s/resource/%s/content/' % (
-            transifex_project_name,
-            transifex_name_from_filename(grd_file_path, filename)))
+    url_part = f'project/{transifex_project_name}/resource/{transifex_name_from_filename(grd_file_path, filename)}/content/'
     url = base_url + url_part
     r = requests.get(url, auth=get_auth())
     assert r.status_code >= 200 and r.status_code <= 299, (
@@ -701,13 +693,13 @@ def check_missing_source_grd_strings_to_transifex(grd_file_path):
     grd_string_names = {string_name for (string_name, message_value,
                                          string_fp, desc) in grd_strings_tuple}
     x_grd_extra_strings = grd_string_names - transifex_string_ids
-    assert len(x_grd_extra_strings) == 0, (
-        'GRD has extra strings over Transifex %s' %
-        list(x_grd_extra_strings))
+    assert (
+        len(x_grd_extra_strings) == 0
+    ), f'GRD has extra strings over Transifex {list(x_grd_extra_strings)}'
     x_transifex_extra_strings = transifex_string_ids - grd_string_names
-    assert len(x_transifex_extra_strings) == 0, (
-        'Transifex has extra strings over GRD %s' %
-        list(x_transifex_extra_strings))
+    assert (
+        len(x_transifex_extra_strings) == 0
+    ), f'Transifex has extra strings over GRD {list(x_transifex_extra_strings)}'
 
 
 def upload_source_files_to_transifex(source_file_path, filename):
@@ -730,8 +722,7 @@ def upload_source_files_to_transifex(source_file_path, filename):
                      encoding='utf-8') as json_file:
             content = json_file.read()
     else:
-        assert False, 'Unsupported source file ext %s: %s' % (
-            ext, source_file_path)
+        assert False, f'Unsupported source file ext {ext}: {source_file_path}'
 
     uploaded = upload_source_string_file_to_transifex(source_file_path,
                                                       filename, content,

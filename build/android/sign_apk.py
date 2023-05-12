@@ -27,13 +27,20 @@ def main():
                 unsigned_apk_path, staging_file.name])
             if os.path.splitext(unsigned_apk_path)[1] == '.apk':
                 cmd_args = [
-                    args.apksigner_path, 'sign',
-                    '--in', staging_file.name,
-                    '--out', unsigned_apk_path,
-                    '--ks', args.key_path,
-                    '--ks-key-alias', args.key_name,
-                    '--ks-pass', 'pass:' + args.key_passwd,
-                    '--key-pass', 'pass:' + args.prvt_key_passwd,
+                    args.apksigner_path,
+                    'sign',
+                    '--in',
+                    staging_file.name,
+                    '--out',
+                    unsigned_apk_path,
+                    '--ks',
+                    args.key_path,
+                    '--ks-key-alias',
+                    args.key_name,
+                    '--ks-pass',
+                    f'pass:{args.key_passwd}',
+                    '--key-pass',
+                    f'pass:{args.prvt_key_passwd}',
                 ]
             else:
                 cmd_args = [

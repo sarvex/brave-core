@@ -23,8 +23,7 @@ import git_common
 def HasFormatErrors():
     # For more options, see vendor/depot_tools/git_cl.py
     cmd = ['cl', 'format', '--diff']
-    diff = git_cl.RunGit(cmd).encode('utf-8')
-    if diff:
+    if diff := git_cl.RunGit(cmd).encode('utf-8'):
         # Verify that git cl format generates a diff
         if git_common.is_dirty_git_tree('git cl format'):
             # Skip verification if there are uncommitted changes
@@ -32,8 +31,7 @@ def HasFormatErrors():
             print('Format errors detected. Run npm format locally to fix.')
             return True
         git_cl.RunGit(['cl', 'format'])
-        git_diff = git_common.run('diff').encode('utf-8')
-        if git_diff:
+        if git_diff := git_common.run('diff').encode('utf-8'):
             print(git_diff)
             print('Format errors have been auto-fixed. Please review and commit these'
                 ' changes if lint was run locally. Otherwise run npm format to fix.')
@@ -42,7 +40,7 @@ def HasFormatErrors():
 
 def RunFormatCheck(upstream_branch): # pylint: disable=inconsistent-return-statements
     upstream_commit = git_cl.RunGit(['merge-base', 'HEAD', upstream_branch])
-    print('Running git cl/gn format on the diff from %s...' % upstream_commit)
+    print(f'Running git cl/gn format on the diff from {upstream_commit}...')
     try:
         if HasFormatErrors():
             return 'Format check failed.'
@@ -101,12 +99,12 @@ def main(args):
         for filename in filenames:
             if white_regex.match(filename):
                 if black_regex.match(filename):
-                    print('Ignoring file %s' % filename)
+                    print(f'Ignoring file {filename}')
                 else:
                     cpplint.ProcessFile(filename, cpplint._cpplint_state.verbose_level,
                                         extra_check_functions)
             else:
-                print('Skipping file %s' % filename)
+                print(f'Skipping file {filename}')
 
         # Run format checks
         format_output = RunFormatCheck(base_branch or cl.GetUpstreamBranch())

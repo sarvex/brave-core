@@ -161,10 +161,11 @@ def AddBraveCredits(prune_paths, special_cases, prune_dirs, additional_paths):
 
 def CheckBraveMissingLicense(target_os, path, error):
     if path.startswith('brave'):
-        if target_os == 'android':
-            if path in DESKTOP_ONLY_PATHS:
-                return  # Desktop failures are not relevant on Android.
-        else:
-            if path in ANDROID_ONLY_PATHS:
-                return  # Android failures are not relevant on desktop.
+        if (
+            target_os == 'android'
+            and path in DESKTOP_ONLY_PATHS
+            or target_os != 'android'
+            and path in ANDROID_ONLY_PATHS
+        ):
+            return  # Desktop failures are not relevant on Android.
         raise error

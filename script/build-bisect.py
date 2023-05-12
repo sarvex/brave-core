@@ -88,8 +88,9 @@ def get_releases(repo):
             releases[tag_name] = release
         page = page + 1
 
-    print('fetch complete; ' + str(len(tag_names)) +
-          ' versions found (excluding ' + str(draft_count) + ' drafts)')
+    print(
+        f'fetch complete; {len(tag_names)} versions found (excluding {str(draft_count)} drafts)'
+    )
 
 
 def filter_releases(args):
@@ -107,30 +108,29 @@ def filter_releases(args):
 
         major_version = str(version[0])
         minor_version = str(version[1])
-        branch_version = major_version + '.' + minor_version + '.x'
+        branch_version = f'{major_version}.{minor_version}.x'
 
         # remove entries which don't match optional branch (if present)
         if args.branch is not None and branch_version != args.branch:
-            print(' - skipping "' + tag +
-                  '" (' + branch_version + ' != ' + args.branch + ')')
+            print(f' - skipping "{tag}" ({branch_version} != {args.branch})')
             continue
 
         # remove entries which don't have installer binary
         if not get_release_asset(tag, False):
-            print(' - skipping "' + tag + '" (installer not found)')
+            print(f' - skipping "{tag}" (installer not found)')
             continue
 
         if args.channel:
             channel = get_release_channel(tag)
             if args.channel != channel:
-                print(' - skipping "' + tag +
-                      '" (not in channel "' + args.channel + '")')
+                print(f' - skipping "{tag}" (not in channel "{args.channel}")')
                 continue
 
         filtered_tag_names.append(tag)
 
-    print('filtering complete (' + str(len(tag_names) -
-          len(filtered_tag_names)) + ' versions removed)')
+    print(
+        f'filtering complete ({str(len(tag_names) - len(filtered_tag_names))} versions removed)'
+    )
     tag_names = filtered_tag_names
 
 
@@ -138,10 +138,9 @@ def get_release_asset(version, verbose=True):
     global releases
     global is_mac_os
 
-    release_id = releases[version]['id']
     if verbose:
-        print('getting installer for  "' + version +
-              '" (release id ' + str(release_id) + ')...')
+        release_id = releases[version]['id']
+        print(f'getting installer for  "{version}" (release id {str(release_id)})...')
 
     # find correct asset for platform
     for asset in releases[version]['assets']:
@@ -165,9 +164,7 @@ def get_release_channel(version):
         return 'dev'
     if full_title.startswith('Beta'):
         return 'beta'
-    if full_title.startswith('Release'):
-        return 'release'
-    return None
+    return 'release' if full_title.startswith('Release') else None
 
 
 def install(download_dir, path):
@@ -175,7 +172,7 @@ def install(download_dir, path):
 
     if is_mac_os:
         print('- installing binary from DMG')
-        print('-> mounting "' + path + '"')
+        print(f'-> mounting "{path}"')
         result = execute(['hdiutil', 'attach', path])
 
         # parse out the mounted volume
@@ -192,7 +189,7 @@ def install(download_dir, path):
             raise Exception('[ERROR] did not find "/Volumes/Brave" sub-string in mount list!\n \
                              Full response from "hdiutil":\n' + result)
 
-        print('-> mounted as "' + volume + '"')
+        print(f'-> mounted as "{volume}"')
 
         # in case volumes are already mounted, remove trailing " 1" or " 2" (etc)
         binary_name = volume.replace("/Volumes/", "")
@@ -201,11 +198,11 @@ def install(download_dir, path):
         volume_path = os.path.join(volume, binary_name)
 
         # copy binary to a temp folder
-        print('-> copying "' + volume_path + '" to "' + download_dir + '"')
+        print(f'-> copying "{volume_path}" to "{download_dir}"')
         result = execute(['cp', '-rp', volume_path, download_dir])
         print('-> copy complete')
 
-        print('-> unmounting "' + volume + '"')
+        print(f'-> unmounting "{volume}"')
         result = execute(['hdiutil', 'detach', volume])
 
         return os.path.join(download_dir, binary_name)
@@ -223,21 +220,21 @@ def setup_profile_directory(args):
         profile_dir = tempdir('build-bisect-profile_')
 
         if args.use_profile:
-            print('-> downloading profile: "' + args.use_profile + '"')
+            print(f'-> downloading profile: "{args.use_profile}"')
             try:
                 filename = os.path.basename(args.use_profile)
                 query_string_index = filename.find('?')
                 if query_string_index > -1:
-                    filename = filename[0:query_string_index]
+                    filename = filename[:query_string_index]
                 download_path = os.path.join(profile_dir, filename)
                 download('profile', args.use_profile, download_path)
                 if filename.endswith('.zip'):
-                    print('-> unzipping to ' + profile_dir)
+                    print(f'-> unzipping to {profile_dir}')
                     extract_zip(download_path, profile_dir)
             except Exception as e:
-                print('whoops- ' + str(e))
+                print(f'whoops- {str(e)}')
 
-        print('-> using profile directory: "' + profile_dir + '"')
+        print(f'-> using profile directory: "{profile_dir}"')
 
         return profile_dir
 
@@ -249,7 +246,7 @@ def get_run_cmd(install_path, profile_dir):
         run_cmd = ['open', '-a', install_path]
         run_params = []
         if profile_dir:
-            run_params = ['--args', '--user-data-dir=' + profile_dir]
+            run_params = ['--args', f'--user-data-dir={profile_dir}']
         return run_cmd + run_params
 
 
@@ -268,7 +265,7 @@ def test_version(args, attempt, tag):
     if not args.demo_mode:
         download_dir = tempdir('build-bisect_')
         download_path = os.path.join(download_dir, asset['name'])
-        print('- downloading to ' + download_path)
+        print(f'- downloading to {download_path}')
         download(tag, asset['browser_download_url'], download_path)
 
         install_path = install(download_dir, download_path)
@@ -284,7 +281,7 @@ def test_version(args, attempt, tag):
             print('please type either `y` for yes or `n` for no!')
         answer = raw_input('Did this version work?: y/n\n')
         first = False
-        if answer == 'y' or answer == 'n':
+        if answer in ['y', 'n']:
             break
 
     return answer == 'y'
@@ -292,14 +289,13 @@ def test_version(args, attempt, tag):
 
 def get_github_token():
     github_token = get_env_var('GITHUB_TOKEN')
-    if len(github_token) == 0:
-        result = execute(
-            ['npm', 'config', 'get', 'BRAVE_GITHUB_TOKEN']).strip()
-        if result == 'undefined':
-            raise Exception('`BRAVE_GITHUB_TOKEN` value not found!')
-        return result
-    else:
+    if len(github_token) != 0:
         return github_token
+    result = execute(
+        ['npm', 'config', 'get', 'BRAVE_GITHUB_TOKEN']).strip()
+    if result == 'undefined':
+        raise Exception('`BRAVE_GITHUB_TOKEN` value not found!')
+    return result
 
 
 def get_nearest_index(version, index_to_get, default):
@@ -308,7 +304,7 @@ def get_nearest_index(version, index_to_get, default):
     try:
         return tag_names.index(version)
     except Exception as e:
-        print('- value "' + version + '" not found. ' + str(e))
+        print(f'- value "{version}" not found. {str(e)}')
         versions = version.split('.')
         if len(versions) != 3:
             return default
@@ -316,17 +312,17 @@ def get_nearest_index(version, index_to_get, default):
         versions.pop()
         results = [i for i in tag_names if i.startswith(
             '.'.join(versions) + '.')]
-        if len(results) == 0:
+        if not results:
             return default
 
-        print('-> using "' + results[index_to_get])
+        print(f'-> using "{results[index_to_get]}')
         return tag_names.index(results[index_to_get])
 
 
 def find_first_broken_version(args):
     global tag_names
 
-    print('bisecting: total of ' + str(len(tag_names)) + ' versions in search set')
+    print(f'bisecting: total of {len(tag_names)} versions in search set')
 
     left_index = 0
     right_index = len(tag_names) - 1
@@ -339,18 +335,19 @@ def find_first_broken_version(args):
         if left_index == 0:
             args.good = None
         else:
-            print('- starting at ' + tag_names[left_index])
+            print(f'- starting at {tag_names[left_index]}')
 
     if args.bad:
         right_index = get_nearest_index(args.bad, -1, right_index)
         if right_index == len(tag_names) - 1:
             args.bad = None
         else:
-            print('- ending at ' + tag_names[right_index])
+            print(f'- ending at {tag_names[right_index]}')
 
     if args.good or args.bad:
-        print('- search set narrowed down to ' + str(right_index - left_index) +
-              ' versions using provided good/bad version(s)')
+        print(
+            f'- search set narrowed down to {str(right_index - left_index)} versions using provided good/bad version(s)'
+        )
 
     attempt_number = 1
 
@@ -358,19 +355,27 @@ def find_first_broken_version(args):
     if not args.good:
         left_tag = tag_names[left_index]
         result = test_version(args, attempt_number, left_tag)
-        attempt_number = attempt_number + 1
+        attempt_number += 1
         if result is False:
-            raise Exception('[ERROR] Version "' + left_tag +
-                            '" is expected to work but doesn\'t')
+            raise Exception(
+                (
+                    f'[ERROR] Version "{left_tag}'
+                    + '" is expected to work but doesn\'t'
+                )
+            )
 
     # right should be NOT working
     if not args.bad:
         right_tag = tag_names[right_index]
         result = test_version(args, attempt_number, right_tag)
-        attempt_number = attempt_number + 1
+        attempt_number += 1
         if result is True:
-            raise Exception('[ERROR] Version "' + right_tag +
-                            '" is expected to fail but doesn\'t')
+            raise Exception(
+                (
+                    f'[ERROR] Version "{right_tag}'
+                    + '" is expected to fail but doesn\'t'
+                )
+            )
 
     # perform search
     works_from = left_index
@@ -380,14 +385,44 @@ def find_first_broken_version(args):
         test_tag = tag_names[test_index]
 
         if args.verbose:
-            print('\n[DEBUG]' +
-                  '\nworks_from=' + tag_names[works_from] + ' (' + str(works_from) + ')' +
-                  '\nfails_at=' + tag_names[fails_at] + ' (' + str(fails_at) + ')' +
-                  '\nleft_index=' + tag_names[left_index] + ' (' + str(left_index) + ')' +
-                  '\nright_index=' + tag_names[right_index] + ' (' + str(right_index) + ')' +
-                  '\ntest_index=' + tag_names[test_index] + ' (' + str(test_index) + ')' +
-                  '\ngap=' + str(fails_at - works_from))
-
+            print(
+                (
+                    (
+                        (
+                            (
+                                '\n[DEBUG]'
+                                + '\nworks_from='
+                                + tag_names[works_from]
+                                + ' ('
+                                + str(works_from)
+                                + ')'
+                                + '\nfails_at='
+                                + tag_names[fails_at]
+                                + ' ('
+                                + str(fails_at)
+                                + ')'
+                                + '\nleft_index='
+                                + tag_names[left_index]
+                                + ' ('
+                                + str(left_index)
+                                + ')'
+                                + '\nright_index='
+                                + tag_names[right_index]
+                                + ' ('
+                                + str(right_index)
+                                + ')'
+                                + '\ntest_index='
+                                + test_tag
+                            )
+                            + ' ('
+                        )
+                        + str(test_index)
+                        + ')'
+                    )
+                    + '\ngap='
+                )
+                + str(fails_at - works_from)
+            )
         result = test_version(args, attempt_number, test_tag)
 
         if left_index == right_index:
@@ -413,8 +448,9 @@ def main():
     supported_platforms = ['Darwin']
 
     if platform.system() not in supported_platforms:
-        print('Error: Platform \'{}\' not supported; acceptable platform(s): {}'
-              .format(platform.system(), ", ".join(supported_platforms)))
+        print(
+            f"""Error: Platform \'{platform.system()}\' not supported; acceptable platform(s): {", ".join(supported_platforms)}"""
+        )
         exit(1)
 
     args = parse_args()
@@ -431,25 +467,26 @@ def main():
 
     filter_releases(args)
     first_broken_version, attempts = find_first_broken_version(args)
-    print('DONE: issue first appeared in "' + str(first_broken_version) +
-          '" (found in ' + str(attempts) + ' attempts)')
+    print(
+        f'DONE: issue first appeared in "{str(first_broken_version)}" (found in {str(attempts)} attempts)'
+    )
 
     try:
         broken_index = tag_names.index(first_broken_version)
         if broken_index > 0:
             previous_release = tag_names[broken_index - 1]
-            versions = 'v' + previous_release + '..v' + first_broken_version
+            versions = f'v{previous_release}..v{first_broken_version}'
             if args.verbose:
-                print(
-                    '[INFO] finding commits using "git log --pretty=oneline ' + versions + '"')
+                print(f'[INFO] finding commits using "git log --pretty=oneline {versions}"')
             commits = execute(
                 ['git', 'log', '--pretty=oneline', versions]).strip()
             commit_lines = commits.split('\n')
-            print('Commits specific to tag "v' + first_broken_version +
-                  '" (' + str(len(commit_lines)) + ' commit(s)):')
+            print(
+                f'Commits specific to tag "v{first_broken_version}" ({len(commit_lines)} commit(s)):'
+            )
             print(commits)
     except Exception as e:
-        print('[ERROR] ' + str(e))
+        print(f'[ERROR] {str(e)}')
 
 
 if __name__ == '__main__':

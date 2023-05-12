@@ -71,9 +71,7 @@ def scoped_cwd(path):
 
 @contextlib.contextmanager
 def scoped_env(key, value):
-    origin = ''
-    if key in os.environ:
-        origin = os.environ[key]
+    origin = os.environ.get(key, '')
     os.environ[key] = value
     try:
         yield
@@ -110,7 +108,7 @@ def download(text, url, path):
                 print(status)
 
         if ci:
-            print("%s done." % (text))
+            print(f"{text} done.")
         else:
             print()
     return path
@@ -148,10 +146,8 @@ def make_zip(zip_file_path, files, dirs):
 
 
 def rm_rf(path):
-    try:
+    with contextlib.suppress(OSError):
         shutil.rmtree(path)
-    except OSError:
-        pass
 
 
 def safe_unlink(path):
@@ -265,19 +261,15 @@ def import_vs_env(target_arch):
     if sys.platform != 'win32':
         return
 
-    if target_arch == 'ia32':
-        vs_arch = 'amd64_x86'
-    else:
-        vs_arch = 'x86_amd64'
+    vs_arch = 'amd64_x86' if target_arch == 'ia32' else 'x86_amd64'
     env = get_vs_env('14.0', vs_arch)
-    os.environ.update(env)
+    os.environ |= env
 
 
 def get_platform():
-    PLATFORM = {
+    return {
         'cygwin': 'win32',
         'darwin': 'darwin',
         'linux2': 'linux',
         'win32': 'win32',
     }[sys.platform]
-    return PLATFORM

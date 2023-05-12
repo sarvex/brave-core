@@ -25,10 +25,10 @@ def get_sign_cmd(file):
     # https://docs.microsoft.com/en-us/dotnet/framework/tools/signtool-exe
     # signtool should be in the path if it was set up correctly by gn through
     # src/build/vs_toolchain.py
-    cmd = 'signtool {}'.format(signtool_args)
+    cmd = f'signtool {signtool_args}'
     if cert:
-        cmd = cmd + ' /n "' + cert + '"'
-    return cmd + ' "' + file + '"'
+        cmd = f'{cmd} /n "{cert}"'
+    return f'{cmd} "{file}"'
 
 
 def run_cmd(cmd):
@@ -43,10 +43,11 @@ def run_cmd(cmd):
 def sign_binaries(base_dir, endswidth=('.exe', '.dll')):
     matches = []
     for root, _, filenames in os.walk(base_dir):
-        for filename in filenames:
-            if filename.endswith(endswidth):
-                matches.append(os.path.join(root, filename))
-
+        matches.extend(
+            os.path.join(root, filename)
+            for filename in filenames
+            if filename.endswith(endswidth)
+        )
     for binary in matches:
         sign_binary(binary)
 

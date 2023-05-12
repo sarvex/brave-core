@@ -16,7 +16,7 @@ def copy_x64(x64_src_path, x64_dest_path):
     """Copies the x64 binary from the x64 build dir."""
 
     if not os.path.exists(x64_src_path):
-        raise Exception('Could not find x64 app (%s)' % x64_src_path)
+        raise Exception(f'Could not find x64 app ({x64_src_path})')
 
     if os.path.exists(x64_dest_path):
         shutil.rmtree(x64_dest_path)

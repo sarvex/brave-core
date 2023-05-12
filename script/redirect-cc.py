@@ -27,10 +27,7 @@ def main():
 def replace_cc_arg(args):
     # Interested in -c <path>.cc
     try:
-        if IS_WIN32:
-            index_c = args.index('/c')
-        else:
-            index_c = args.index('-c')
+        index_c = args.index('/c') if IS_WIN32 else args.index('-c')
     except ValueError:
         # no -c or /c so just skip
         return

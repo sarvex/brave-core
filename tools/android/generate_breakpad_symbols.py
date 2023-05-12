@@ -25,7 +25,7 @@ def GetDumpSymsBinary(build_dir=None):
     DUMP_SYMS = 'dump_syms'
     dump_syms_bin = os.path.join(os.path.expanduser(build_dir), DUMP_SYMS)
     if not os.access(dump_syms_bin, os.X_OK):
-        print('Cannot find %s.' % dump_syms_bin)
+        print(f'Cannot find {dump_syms_bin}.')
         return None
 
     return dump_syms_bin
@@ -61,7 +61,7 @@ def GetRequiredLibsPaths(args, extension):
     for lib in libs_in_package:
         # Cut out 'crazy.' if exists, see //chrome/android/chrome_public_apk_tmpl.gni
         lib_name = os.path.basename(lib).replace('crazy.', '')
-        if not lib_name in ignored_libs:
+        if lib_name not in ignored_libs:
             libs_only_names.add(lib_name)
 
     libs_result = []
@@ -85,10 +85,7 @@ def GetRequiredLibsPaths(args, extension):
             if os.path.exists(lib_path):
                 libs_result.append(lib_path)
 
-    # Remove the duplicates, can have in the case when apk/aab contains two abis
-    libs_result = list(set(libs_result))
-
-    return libs_result
+    return list(set(libs_result))
 
 
 def InvokeChromiumGenerateSymbols(args, lib_paths):
@@ -110,14 +107,15 @@ def InvokeChromiumGenerateSymbols(args, lib_paths):
 
             try:
                 # Invoke the original Chromium script
-                args_to_pass = ['python',
-                                chromium_script,
-                                '--build-dir=' + args.build_dir,
-                                '--symbols-dir=' + args.symbols_dir,
-                                '--binary=' + lib_path,
-                                '--platform=android',
-                                '--verbose'
-                               ]
+                args_to_pass = [
+                    'python',
+                    chromium_script,
+                    f'--build-dir={args.build_dir}',
+                    f'--symbols-dir={args.symbols_dir}',
+                    f'--binary={lib_path}',
+                    '--platform=android',
+                    '--verbose',
+                ]
 
                 ret = subprocess.call(args_to_pass)
 
@@ -143,10 +141,7 @@ def InvokeChromiumGenerateSymbols(args, lib_paths):
 
     queue.join()
 
-    if at_least_one_failed.value:
-        return 1
-
-    return 0
+    return 1 if at_least_one_failed.value else 0
 
 def main():
     parser = argparse.ArgumentParser(description='Generates symbols for Android package')

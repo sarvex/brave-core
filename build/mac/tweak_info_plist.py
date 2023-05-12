@@ -55,7 +55,7 @@ def _OverrideVersionKey(plist, brave_version):
     version_values = brave_version.split('.')
     if int(version_values[0]) >= 1:
         adjusted_minor = int(version_values[1]) + (100 * int(version_values[0]))
-        plist['CFBundleVersion'] = str(adjusted_minor) + '.' + version_values[2]
+        plist['CFBundleVersion'] = f'{str(adjusted_minor)}.{version_values[2]}'
 
 
 def Main():

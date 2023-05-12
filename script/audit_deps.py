@@ -64,15 +64,16 @@ def main():
         )
 
     args = parse_args()
-    errors = 0
-
     if args.input_dir:
         return audit_path(os.path.abspath(args.input_dir), args)
 
-    for path in [os.path.dirname(os.path.dirname(args.source_root)),
-                 args.source_root]:
-        errors += audit_path(path, args)
-
+    errors = sum(
+        audit_path(path, args)
+        for path in [
+            os.path.dirname(os.path.dirname(args.source_root)),
+            args.source_root,
+        ]
+    )
     for dir_path, dirs, _ in os.walk(args.source_root):
         for dir_name in dirs:
             full_path = os.path.join(dir_path, dir_name)
@@ -104,12 +105,7 @@ def audit_path(path, args):
 
 def npm_audit_deps(path, args):
     """Run `npm audit' in the specified path."""
-    # pylint: disable=consider-using-with
-
-    npm_cmd = 'npm'
-    if sys.platform.startswith('win'):
-        npm_cmd = 'npm.cmd'
-
+    npm_cmd = 'npm.cmd' if sys.platform.startswith('win') else 'npm'
     npm_args = [npm_cmd, 'audit', '--json']
     if not args.audit_dev_deps:
         # Don't support npm audit --production until dev dependencies are
@@ -163,15 +159,14 @@ def cargo_audit_deps(path, args):
             os.path.join(rustup_path, 'toolchains', args.toolchain, "bin"))
         env['PATH'] = toolchains_path + os.pathsep + env['PATH']
 
-    cargo_args = []
-    cargo_args.append("cargo" if sys.platform != "win32" else rustup_bin_exe)
-    cargo_args.append("audit")
-    cargo_args.append("--file")
-    cargo_args.append(os.path.join(path, "Cargo.lock"))
+    cargo_args = [
+        "cargo" if sys.platform != "win32" else rustup_bin_exe,
+        "audit",
+        "--file",
+        os.path.join(path, "Cargo.lock"),
+    ]
     for advisory in IGNORED_CARGO_ADVISORIES:
-        cargo_args.append("--ignore")
-        cargo_args.append(advisory)
-
+        cargo_args.extend(("--ignore", advisory))
     return subprocess.call(cargo_args, env=env)
 
 
@@ -186,10 +181,12 @@ def extract_resolutions(result):
             return resolutions
         for _, v in advisories.items():
             via = v['via']
-            for item in via:
-                if isinstance(item, dict) and \
-                   item['url'] not in IGNORED_NPM_ADVISORIES:
-                    resolutions.append(item['url'])
+            resolutions.extend(
+                item['url']
+                for item in via
+                if isinstance(item, dict)
+                and item['url'] not in IGNORED_NPM_ADVISORIES
+            )
     # npm 6 and earlier
     if 'advisories' in result:
         advisories = result['advisories']

@@ -117,8 +117,10 @@ def external_component_license_file(preamble, components):
 def list_sub_components(base_dir):
     found = []
     for dirpath, dirs, dummy in os.walk(base_dir):
-        for dir_name in sorted(dirs):
-            found.append(extract_license_info(os.path.join(dirpath, dir_name)))
+        found.extend(
+            extract_license_info(os.path.join(dirpath, dir_name))
+            for dir_name in sorted(dirs)
+        )
     return found
 
 
@@ -148,8 +150,7 @@ def list_ntp_backgrounds(metadata_file):
                      "[") \
             .replace('"', '"').replace("'", '"')
 
-    images = json.loads(json_metadata)
-    return images
+    return json.loads(json_metadata)
 
 
 def validated_data_field(data, field_name):
@@ -174,9 +175,11 @@ def generate_backgrounds_license(preamble, backgrounds):
         author_link = background['link']
         original_url = validated_data_field(background, 'originalUrl')
         license_text = validated_data_field(background, 'license')
-        if license_text != 'used with permission' \
-           and license_text[0:8] != 'https://' \
-           and license_text[0:7] != 'http://':
+        if (
+            license_text != 'used with permission'
+            and license_text[:8] != 'https://'
+            and license_text[:7] != 'http://'
+        ):
             print('Invalid license for background image ' \
                   f"{background['name']}. It needs to be a URL or the " \
                   'string "used with permission".')

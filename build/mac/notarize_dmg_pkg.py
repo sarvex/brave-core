@@ -28,7 +28,7 @@ packaging_signing_path = os.path.realpath(os.path.dirname(os.path.realpath(__fil
 sys.path.append(packaging_signing_path)
 
 def run_command(args, **kwargs):
-    print('Running command: {}'.format(args))
+    print(f'Running command: {args}')
     subprocess.check_call(args, **kwargs)
 
 
@@ -105,8 +105,9 @@ def main():
                                args.development)
     paths = model.Paths(args.pkgdir, args.outdir, None)
 
-    rc = NotarizeBraveDmgPkg(paths, config, args.dmg, args.pkg, args.outdir, args.signed)
-    return rc
+    return NotarizeBraveDmgPkg(
+        paths, config, args.dmg, args.pkg, args.outdir, args.signed
+    )
 
 
 def parse_args():

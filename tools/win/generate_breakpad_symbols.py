@@ -20,7 +20,7 @@ from shutil import rmtree, move
 
 async def ProcessBinary(semaphore, options, binary):
     dump_syms = os.path.join(options.build_dir, 'dump_syms.exe')
-    sym_temp_output = binary + '.sym'
+    sym_temp_output = f'{binary}.sym'
     error = None
     async with semaphore:
         start_time = datetime.utcnow()
@@ -49,11 +49,10 @@ async def ProcessBinary(semaphore, options, binary):
             if not module_line:
                 return False, f'No module name found for {binary}'
 
-        output_path = os.path.join(options.symbols_dir, module_line.group(2),
-                                   module_line.group(1))
+        output_path = os.path.join(options.symbols_dir, module_line[2], module_line[1])
         mkdir_p(output_path)
 
-        symbol_file = f'{module_line.group(2)[:-4]}.sym'  # strip .pdb
+        symbol_file = f'{module_line[2][:-4]}.sym'
         move(sym_temp_output, symbol_file)
         if options.verbose:
             elapsed = datetime.utcnow() - start_time
@@ -67,19 +66,17 @@ def mkdir_p(path):
     try:
         os.makedirs(path)
     except OSError as e:
-        if e.errno == errno.EEXIST and os.path.isdir(path):
-            pass
-        else:
+        if e.errno != errno.EEXIST or not os.path.isdir(path):
             raise
 
 
 async def GenerateSymbols(options, binaries):
     """Dumps the symbols of binary and places them in the given directory."""
     semaphore = asyncio.Semaphore(os.cpu_count())
-    task_list = []
-    for binary in binaries:
-        task_list.append(
-            asyncio.create_task(ProcessBinary(semaphore, options, binary)))
+    task_list = [
+        asyncio.create_task(ProcessBinary(semaphore, options, binary))
+        for binary in binaries
+    ]
     result_list = await asyncio.gather(*task_list)
     first_warning_printed = False
     for success, error_message in result_list:

@@ -65,7 +65,7 @@ def FindBundlePart(full_path):
 def GetDSYMBundle(options, binary_path):
     """Finds the .dSYM bundle to the binary."""
     if os.path.isabs(binary_path):
-        dsym_path = binary_path + '.dSYM'
+        dsym_path = f'{binary_path}.dSYM'
         if os.path.exists(dsym_path):
             return dsym_path
 
@@ -73,10 +73,10 @@ def GetDSYMBundle(options, binary_path):
     search_dirs = [options.build_dir, options.libchromiumcontent_dir]
     if filename.endswith(('.dylib', '.framework', '.app')):
         for directory in search_dirs:
-            dsym_path = os.path.join(directory, os.path.splitext(filename)[0]) + '.dSYM'
+            dsym_path = f'{os.path.join(directory, os.path.splitext(filename)[0])}.dSYM'
             if os.path.exists(dsym_path):
                 return dsym_path
-            dsym_path = os.path.join(directory, filename) + '.dSYM'
+            dsym_path = f'{os.path.join(directory, filename)}.dSYM'
             if os.path.exists(dsym_path):
                 return dsym_path
 
@@ -86,11 +86,8 @@ def GetDSYMBundle(options, binary_path):
 def GetSymbolPath(options, binary_path):
     """Finds the .dbg to the binary."""
     filename = os.path.basename(binary_path)
-    dbg_path = os.path.join(options.libchromiumcontent_dir, filename) + '.dbg'
-    if os.path.exists(dbg_path):
-        return dbg_path
-
-    return binary_path
+    dbg_path = f'{os.path.join(options.libchromiumcontent_dir, filename)}.dbg'
+    return dbg_path if os.path.exists(dbg_path) else binary_path
 
 
 def Resolve(path, exe_path, loader_path, rpaths):
@@ -120,9 +117,8 @@ def GetSharedLibraryDependenciesLinux(binary):
     lib_re = re.compile(r'\t.* => (.+) \(.*\)$')
     result = []
     for line in ldd.splitlines():
-        m = lib_re.match(line)
-        if m:
-            result.append(m.group(1))
+        if m := lib_re.match(line):
+            result.append(m[1])
     return result
 
 
@@ -136,16 +132,14 @@ def GetSharedLibraryDependenciesMac(binary, exe_path):
     for idx, line in enumerate(otool):
         if line.find('cmd LC_RPATH') != -1:
             m = re.match(r' *path (.*) \(offset .*\)$', otool[idx+2])
-            rpaths.append(m.group(1))
+            rpaths.append(m[1])
 
     otool = GetCommandOutput(['otool', '-L', binary]).splitlines()
     lib_re = re.compile(r'\t(.*) \(compatibility .*\)$')
     deps = []
     for line in otool:
-        m = lib_re.match(line)
-        if m:
-            dep = Resolve(m.group(1), exe_path, loader_path, rpaths)
-            if dep:
+        if m := lib_re.match(line):
+            if dep := Resolve(m[1], exe_path, loader_path, rpaths):
                 deps.append(os.path.normpath(dep))
     return deps
 
@@ -161,11 +155,7 @@ def GetSharedLibraryDependencies(binary, exe_path):
         print("Platform not supported.")
         sys.exit(1)
 
-    result = []
-    for dep in deps:
-        if os.access(dep, os.F_OK):
-            result.append(dep)
-    return result
+    return [dep for dep in deps if os.access(dep, os.F_OK)]
 
 
 def mkdir_p(path):
@@ -173,9 +163,8 @@ def mkdir_p(path):
     try:
         os.makedirs(path)
     except OSError as e:
-        if e.errno == errno.EEXIST and os.path.isdir(path):
-            pass
-        else: raise
+        if e.errno != errno.EEXIST or not os.path.isdir(path):
+            raise
 
 
 def GenerateSymbols(options, binaries):
@@ -200,13 +189,11 @@ def GenerateSymbols(options, binaries):
 
                 syms = GetCommandOutput([GetDumpSymsBinary(options.build_dir), '-r', '-c', binary])
                 module_line = re.match("MODULE [^ ]+ [^ ]+ ([0-9A-F]+) (.*)\n", syms)
-                output_path = os.path.join(options.symbols_dir, module_line.group(2),
-                                           module_line.group(1))
+                output_path = os.path.join(options.symbols_dir, module_line[2], module_line[1])
                 mkdir_p(output_path)
-                symbol_file = "%s.sym" % module_line.group(2)
-                f = open(os.path.join(output_path, symbol_file), 'w') # pylint: disable=consider-using-with
-                f.write(syms)
-                f.close()
+                symbol_file = f"{module_line[2]}.sym"
+                with open(os.path.join(output_path, symbol_file), 'w') as f:
+                    f.write(syms)
             except Exception as inst: # pylint: disable=broad-except
                 if options.verbose:
                     with print_lock:

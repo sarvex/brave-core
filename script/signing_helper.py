@@ -42,8 +42,7 @@ def file_exists(path):
 
 def run_command(args, **kwargs):
     """ Runs the given executable with the given arguments """
-    print('Running command: {}'.format(args)
-          )  # pylint: disable=superfluous-parens
+    print(f'Running command: {args}')
     subprocess.check_call(args, **kwargs)
 
 
@@ -57,13 +56,16 @@ def GenerateBraveWidevineSigFile(paths, config, part):
         from signing.signing import sign_part  # pylint: disable=import-error
         sign_part(paths, config, part)
         # Generate signature file
-        chrome_framework_name = config.app_product + ' Framework'
+        chrome_framework_name = f'{config.app_product} Framework'
         chrome_framework_version_path = os.path.join(paths.work, part.path,
                                                      'Versions', config.version)
         sig_source_file = os.path.join(
             chrome_framework_version_path, chrome_framework_name)
-        sig_target_file = os.path.join(chrome_framework_version_path, 'Resources',
-                                       chrome_framework_name + '.sig')
+        sig_target_file = os.path.join(
+            chrome_framework_version_path,
+            'Resources',
+            f'{chrome_framework_name}.sig',
+        )
         assert file_exists(
             sig_source_file), 'Wrong source path for sig generation'
 
@@ -82,7 +84,7 @@ def AddBravePartsForSigning(parts, config):
     parts = collections.OrderedDict(parts)
     from signing.model import CodeSignedProduct, VerifyOptions, CodeSignOptions  # pylint: disable=import-error
 
-    development = True if config.provisioning_profile_basename is None else False
+    development = config.provisioning_profile_basename is None
 
     full_hardened_runtime_options = (
         CodeSignOptions.HARDENED_RUNTIME + CodeSignOptions.RESTRICT +

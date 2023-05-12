@@ -8,15 +8,12 @@ def get_content_type(filename):
 
 
 def get(url, headers):
-    response = requests.get(url, headers=headers)
-    return response
+    return requests.get(url, headers=headers)
 
 
 def post(url, params, headers):
-    response = requests.post(url, json=params, headers=headers)
-    return response
+    return requests.post(url, json=params, headers=headers)
 
 
 def post_with_file(url, files, params, headers):
-    response = requests.post(url, files=files, data=params, headers=headers)
-    return response
+    return requests.post(url, files=files, data=params, headers=headers)

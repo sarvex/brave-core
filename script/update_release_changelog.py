@@ -48,17 +48,15 @@ def main():
             "\"refs/tags/\"", "\"v\""))
         exit(1)
 
-    match = re.match(r'^refs/tags/(.*)$', tag)
-    if match:
-        tag = match.group(1)
+    if match := re.match(r'^refs/tags/(.*)$', tag):
+        tag = match[1]
 
-    match = re.match(r'^v(.*)$', tag)
-    if match:
-        version = match.group(1)
+    if match := re.match(r'^v(.*)$', tag):
+        version = match[1]
 
-    logging.debug("CHANGELOG_URL: {}".format(changelog_url))
-    logging.debug("TAG: {}".format(tag))
-    logging.debug("VERSION: {}".format(version))
+    logging.debug(f"CHANGELOG_URL: {changelog_url}")
+    logging.debug(f"TAG: {tag}")
+    logging.debug(f"VERSION: {version}")
 
     changelog_txt = download_from_url(args, logging, changelog_url)
 
@@ -68,22 +66,20 @@ def main():
     repo = GitHub(get_env_var('GITHUB_TOKEN')).repos(BRAVE_REPO)
     release = get_release(repo, tag, allow_published_release_updates=True)
 
-    logging.debug(
-        "Release body before update: \n\'{}\'".format(release['body']))
+    logging.debug(f"Release body before update: \n\'{release['body']}\'")
 
     logging.info("Merging original release body with changelog")
     new_body = release['body'] + '\n\n' + tag_changelog_txt
-    logging.debug("release body is now: \n\'{}\'".format(new_body))
+    logging.debug(f"release body is now: \n\'{new_body}\'")
 
     data = dict(tag_name=tag, name=release['name'], body=new_body)
     id = release['id']
-    logging.debug("Updating release with id: {}".format(id))
+    logging.debug(f"Updating release with id: {id}")
     release = retry_func(
         lambda run: repo.releases.__call__(f'{id}').patch(data=data),
         catch=requests.exceptions.ConnectionError, retries=3
     )
-    logging.debug(
-        "Release body after update: \n\'{}\'".format(release['body']))
+    logging.debug(f"Release body after update: \n\'{release['body']}\'")
 
 
 def debug_requests_on():

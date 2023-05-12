@@ -40,7 +40,7 @@ def get_github_tags(branch):
     headers = {'Accept': 'application/vnd.github+json',
                'Authorization': 'token ' + os.environ.get('BRAVE_GITHUB_TOKEN')
                }
-    tag_url = GITHUB_URL + "/repos/brave/brave-core/tags" + '?page=1&per_page=100'
+    tag_url = f"{GITHUB_URL}/repos/brave/brave-core/tags?page=1&per_page=100"
 
     r = call_github_api(tag_url, headers=headers)
     next_request = ""
@@ -51,8 +51,7 @@ def get_github_tags(branch):
     # https://developer.github.com/v3/#pagination
     while next_request is not None:
         for item in r.json():
-            match = re.search(branch, item['name'])
-            if match:
+            if match := re.search(branch, item['name']):
                 tags.append(item['name'])
         if r.links.get("next"):
             next_request = r.links["next"]["url"]
@@ -65,11 +64,10 @@ def get_github_tags(branch):
 
 def main():
     branch = os.environ.get('CHANNEL_BRANCH')
-    match = re.search(r'\d+[.]\d+', branch)
-    if match:
-        branch = match.group(0)
+    if match := re.search(r'\d+[.]\d+', branch):
+        branch = match[0]
     else:
-        print("Error: Malformed branch \'{}\'".format(branch))
+        print(f"Error: Malformed branch \'{branch}\'")
         exit(1)
 
     items = get_github_tags(branch)

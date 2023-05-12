@@ -29,14 +29,14 @@ def run(args):
     env["PATH"] = rustup_bin + os.pathsep + env["PATH"]
 
     # Install the tool
-    cargo_args = []
-    cargo_args.append(cbindgen_bin)
-    cargo_args.append("--config")
-    cargo_args.append(args.config)
-    cargo_args.append("--output")
-    cargo_args.append(args.output)
-    cargo_args.append(args.path)
-
+    cargo_args = [
+        cbindgen_bin,
+        "--config",
+        args.config,
+        "--output",
+        args.output,
+        args.path,
+    ]
     try:
         subprocess.check_call(cargo_args, env=env)
     except subprocess.CalledProcessError as e:
@@ -52,9 +52,7 @@ def parse_args():
     parser.add_argument("--config", required=True)
     parser.add_argument("--output", required=True)
 
-    args = parser.parse_args()
-
-    return args
+    return parser.parse_args()
 
 
 def main():

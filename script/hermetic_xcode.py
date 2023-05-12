@@ -22,7 +22,7 @@ MAC_FILES = os.path.join(CHROMIUM_SRC_ROOT, 'build', 'mac_files')
 def _run(*args, workdir=None, extra_env={}):
     # Set environment variables for subprocess
     env = os.environ.copy()
-    env.update(extra_env)
+    env |= extra_env
 
     try:
         result = subprocess.run(

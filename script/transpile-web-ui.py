@@ -99,16 +99,14 @@ def transpile_web_uis(options):
         args.append("--output-public-path=" + options['public_asset_path'])
 
     # web pack aliases
-    for alias in options['webpack_aliases']:
-        args.append("--webpack_alias=" + alias)
-
+    args.extend(f"--webpack_alias={alias}" for alias in options['webpack_aliases'])
     # extra module locations
-    for module_path in options['extra_modules']:
-        args.append("--extra_modules=" + module_path)
-
+    args.extend(
+        f"--extra_modules={module_path}"
+        for module_path in options['extra_modules']
+    )
     # entrypoints
-    for entry in options['entry_points']:
-        args.append(entry)
+    args.extend(iter(options['entry_points']))
     env["ROOT_GEN_DIR"] = options['root_gen_dir']
     env["TARGET_GEN_DIR"] = options['target_gen_dir']
     env["DEPFILE_PATH"] = options['depfile_path']
@@ -127,7 +125,7 @@ def generate_grd(target_include_dir, grd_name, resource_name, env=None):
 
     env["RESOURCE_NAME"] = resource_name
     env["GRD_NAME"] = grd_name
-    env["ID_PREFIX"] = "IDR_" + resource_name.upper() + '_'
+    env["ID_PREFIX"] = f"IDR_{resource_name.upper()}_"
     env["TARGET_DIR"] = target_include_dir
 
     dirname = os.path.abspath(os.path.join(__file__, '..', '..'))

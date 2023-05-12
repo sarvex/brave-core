@@ -127,7 +127,7 @@ def main():
             'Report not found. Sending file to VirusTotal for scanning.')
         vt.upload(args.file)
 
-        while (response == SCAN_NOT_FOUND or response == SCAN_ERROR):
+        while response in [SCAN_NOT_FOUND, SCAN_ERROR]:
             LOGGER.info(
                 f"Scan still running, sleeping for {WAIT_TIME} seconds.")
             sleep(WAIT_TIME)
